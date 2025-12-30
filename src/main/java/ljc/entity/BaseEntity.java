@@ -7,7 +7,7 @@ import lombok.Data;
  */
 @Data
 public class BaseEntity {
-    protected String name;       // protected 关键字让子类可以直接访问
+    protected String name;
     protected Integer level;
     protected Integer maxHp;
     protected Integer currentHp;
