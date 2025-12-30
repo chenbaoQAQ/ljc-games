@@ -1,0 +1,21 @@
+# 编译后的文件 (Java compile files)
+target/
+*.class
+
+# 日志文件 (Log files)
+*.log
+
+# IDEA 配置文件 (JetBrains IDEA files)
+.idea/
+*.iml
+*.iws
+out/
+
+# 系统临时文件 (System temporary files)
+.DS_Store
+Thumbs.db
+
+# Maven 本地配置 (Maven files)
+.mvn/
+mvnw
+mvnw.cmd
