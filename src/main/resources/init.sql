@@ -1,17 +1,17 @@
--- 初始化基础兵种
-INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp) VALUES ('INFANTRY', 1, 10, 2);
-INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp) VALUES ('ARCHER', 1, 15, 1);
-INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp) VALUES ('CAVALRY', 2, 25, 3);
+-- 清理旧数据并重新插入更合理的个位数数值
+TRUNCATE TABLE unit_config;
 
--- 初始化你的特色特种兵 (拐机制)
--- 中国特种兵：强化刀兵(INFANTRY) 1:2
+-- 刀(1)、弓(1.5->四舍五入设为2)、骑(3)
+INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp) VALUES ('INFANTRY', 1, 1, 2);
+INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp) VALUES ('ARCHER', 1, 2, 1);
+INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp) VALUES ('CAVALRY', 2, 3, 3);
+
+-- 特种兵：中国步兵拐 (CN_SPECIAL)
+-- 自身攻击设为2，强化比例1:2，让刀兵攻击从1变成2 (buff_ratio=2.0)
 INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp, target_type, buff_ratio)
-VALUES ('CN_SPECIAL', 3, 30, 4, 'INFANTRY', 2.0);
+VALUES ('CN_SPECIAL', 3, 2, 4, 'INFANTRY', 2.0);
 
--- 英国特种兵：强化武将(HERO) 5:1 (倍率设为0.2，算法里用 count*ratio)
+-- 特种兵：英国英雄拐 (EN_SPECIAL)
+-- 自身攻击设为3，强化比例5:1 (buff_ratio=0.2)
 INSERT INTO unit_config (unit_name, space_cost, base_atk, base_hp, target_type, buff_ratio)
-VALUES ('EN_SPECIAL', 3, 35, 4, 'HERO', 0.2);
-
--- 初始化一个演示武将
-INSERT INTO general_template (name, rarity, base_leadership, country)
-VALUES ('赵云', 'SSR', 500, 'CN');
+VALUES ('EN_SPECIAL', 3, 3, 4, 'HERO', 0.2);
