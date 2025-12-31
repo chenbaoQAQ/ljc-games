@@ -1,91 +1,118 @@
 package ljc.service;
 
-import ljc.constant.DifficultyTier;
-import ljc.entity.StageConfig;
-import ljc.entity.UnitConfig;
+import ljc.entity.*;
 import ljc.model.Army;
+import ljc.repository.EquipmentRepository;
+import ljc.repository.UserGeneralRepository;
+import ljc.repository.UserProfileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.*;
+import java.util.*;
 
 @Service
 public class BattleService {
+    @Autowired
+    private EquipmentRepository equipmentRepository; // 补上这一行，消灭变量名红字
+    @Autowired
+    private CombatEngine combatEngine; // 刚才写的数值修正引擎
+    @Autowired
+    private LootService lootService;     // 装备掉落服务
+    @Autowired
+    private UserProfileRepository userProfileRepository;
+    @Autowired
+    private UserGeneralRepository generalRepository;
 
-    /**
-     * 1. 破墙逻辑 (保持不变)
-     */
-    public void processWallBreachWithPlan(Army army, StageConfig stage, Map<UnitConfig, Integer> sacrificePlan) {
-        if (!stage.getHasWall()) return;
-        int requiredCost = stage.getWallCost();
-        int totalPlanned = sacrificePlan.values().stream().mapToInt(Integer::intValue).sum();
-
-        if (totalPlanned < requiredCost) {
-            throw new RuntimeException("牺牲人数不足以破墙！需要: " + requiredCost);
-        }
-
-        Map<UnitConfig, Integer> currentTroops = army.getTroopMap();
-        sacrificePlan.forEach((unit, count) -> {
-            int current = currentTroops.getOrDefault(unit, 0);
-            currentTroops.put(unit, Math.max(0, current - count));
-        });
-    }
-
-    /**
-     * 2. 计算敌方动态战力 (含 BOSS 和 难度)
-     */
-    public int getEnemyPower(int basePower, StageConfig stage, DifficultyTier tier) {
-        double stageBuff = stage.getEnemyAtkBuff().doubleValue();
-        double tierFactor = tier.getFactor();
-        return (int) (basePower * stageBuff * tierFactor);
-    }
-
-    /**
-     * 3. 核心：回合制模拟战 (Simulated Round Battle)
-     * 解决你说的：人少了，伤害也得跟着少
-     */
-    public List<String> conductBattle(Army army, StageConfig stage, DifficultyTier tier, Map<UnitConfig, Integer> sacrificePlan) {
+    @Transactional
+    public List<String> conductBattle(Integer userId, Integer generalId, StageConfig stage, Army army) {
         List<String> battleLog = new ArrayList<>();
 
-        // A. 战前处理
-        if (stage.getHasWall()) {
-            processWallBreachWithPlan(army, stage, sacrificePlan);
-            battleLog.add("【城墙】破墙成功，部队已产生损耗。");
-        }
+        // 1. 战前准备：加载武将与装备
+        UserGeneral general = generalRepository.findById(generalId)
+                .orElseThrow(() -> new RuntimeException("找不到武将"));
+        List<Equipment> equips = equipmentRepository.findByOwnerGeneralId(generalId);
 
-        // B. 敌军初始化 (假设敌军生命值等于其总战力)
-        int enemyBasePower = 1000;
-        int enemyHP = getEnemyPower(enemyBasePower, stage, tier);
+        battleLog.add(String.format("【出征】主将 [%s] (性格:%s) 领兵出战！",
+                general.getName(), general.getPersonality()));
+
+        // 2. 初始数据计算
+        int enemyHP = stage.getEnemyBaseHp();
         int round = 1;
+        boolean isVictory = false;
 
-        // C. 回合循环 (交互开始)
-        // 只要玩家还有兵，且敌军血量 > 0，就继续打
-        while (army.getTotalUnitCount() > 0 && enemyHP > 0) {
-            // 1. 玩家回合：基于【当前剩余兵力】计算攻击力
-            int currentPlayerAtk = army.calculateTotalPower();
-            enemyHP -= currentPlayerAtk;
-            battleLog.add(String.format("第%d回合: 玩家发动进攻，造成%d伤害，敌方剩余血量:%d", round, currentPlayerAtk, Math.max(0, enemyHP)));
+        // 3. 核心回合逻辑
+        while (army.getTotalUnitCount() > 0 && enemyHP > 0 && !general.getStatus().equals("KILLED")) {
+            // A. 动态计算玩家实时攻击力 (包含：实时人数、装备、性格、状态惩罚)
+            double currentAtk = combatEngine.calculateFinalAtk(army.calculateTotalPower(), equips, general);
 
-            if (enemyHP <= 0) break; // 敌军全灭
+            enemyHP -= (int)currentAtk;
+            battleLog.add(String.format("第%d回合: 玩家进攻造成 %d 伤害，敌方残余血量: %d",
+                    round, (int)currentAtk, Math.max(0, enemyHP)));
 
-            // 2. 敌军回合：反击玩家
-            // 这里的逻辑：敌军伤害直接按比例扣除玩家的兵力 (简单的战损模型)
-            int enemyAtk = (int) (enemyHP * 0.1); // 假设敌军每10点血提供1点攻击
-            army.receiveDamage(enemyAtk); // 这是一个新方法，需要你在Army里写：按比例减员
+            if (enemyHP <= 0) {
+                isVictory = true;
+                break;
+            }
 
-            battleLog.add(String.format("第%d回合: 敌方发起反击，造成%d战损，玩家剩余总兵力:%d", round, enemyAtk, army.getTotalUnitCount()));
+            // B. 敌方反击与主将风险判定
+            int enemyAtk = (int)(stage.getEnemyAtkBuff().doubleValue() * 50); // 示例基础伤害
+            army.receiveDamage(enemyAtk); // 士兵受损
+
+            // 判定主将是否被流矢射中 (性格影响：暴躁性格更容易受伤)
+            checkGeneralStatus(general, enemyAtk, battleLog);
+
+            battleLog.add(String.format("第%d回合: 敌方反击，玩家兵力剩余: %d，主将状态: %s",
+                    round, army.getTotalUnitCount(), general.getStatus()));
 
             round++;
-            if (round > 50) break; // 防止死循环，强行平局
+            if (round > 50) break;
         }
 
-        // D. 结果判定
-        if (enemyHP <= 0) {
-            battleLog.add("--- 最终结果: VICTORY ---");
-        } else {
-            battleLog.add("--- 最终结果: DEFEAT ---");
-        }
+        // 4. 战后清算 (这是最关键的逻辑更新)
+        processPostBattle(userId, general, army, stage, isVictory, battleLog);
 
         return battleLog;
+    }
+
+    private void checkGeneralStatus(UserGeneral general, int enemyAtk, List<String> log) {
+        double injuryChance = (enemyAtk > 100) ? 0.15 : 0.05;
+        // 暴躁性格受伤概率翻倍
+        if ("RASH".equals(general.getPersonality())) injuryChance *= 2;
+
+        if (Math.random() < injuryChance) {
+            if ("HEALTHY".equals(general.getStatus())) {
+                general.setStatus("WOUNDED");
+                log.add("！！！【战报】主将受伤，战力下降 20%！");
+            } else if ("WOUNDED".equals(general.getStatus()) && Math.random() < 0.2) {
+                general.setStatus("KILLED");
+                log.add("！！！【噩耗】主将阵亡，全军溃散！");
+            }
+        }
+    }
+
+    private void processPostBattle(Integer userId, UserGeneral general, Army army,
+                                   StageConfig stage, boolean isVictory, List<String> log) {
+        UserProfile user = userProfileRepository.findById(userId).get();
+
+        if (isVictory) {
+            log.add("--- 战斗胜利 ---");
+            // 恢复 70% 伤兵
+            army.recoverTroops(0.7);
+            // 发放金币与钻石
+            user.setGold(user.getGold() + stage.getGoldReward());
+            // 触发掉落逻辑
+            log.add(lootService.dropEquipment(userId, stage));
+        } else {
+            log.add("--- 战斗失败 ---");
+            // 仅存 20% 溃军
+            army.recoverTroops(0.2);
+            // 失败惩罚：如果是主将阵亡，兵力清零
+            if ("KILLED".equals(general.getStatus())) army.clearTroops();
+        }
+
+        // 保存所有状态
+        userProfileRepository.save(user);
+        generalRepository.save(general);
     }
 }

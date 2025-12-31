@@ -1,7 +1,7 @@
 package ljc.entity;
 
-import jakarta.persistence.*;
 import lombok.Data;
+import jakarta.persistence.*;
 import java.math.BigDecimal;
 
 @Data
@@ -11,21 +11,16 @@ public class StageConfig {
     @Id
     private Integer id;
 
-    @Column(name = "region_id")
     private Integer regionId;
-
-    @Column(name = "region_name")
-    private String regionName;
-
-    @Column(name = "has_wall")
-    private Boolean hasWall; // 数据库 tinyint(1) 会自动对应 Boolean
-
-    @Column(name = "is_boss")
+    private String stageName;
+    private Boolean hasWall;
     private Boolean isBoss;
-
-    @Column(name = "wall_cost")
     private Integer wallCost;
+    private BigDecimal enemyAtkBuff;
+    private Integer enemyBaseHp;
 
-    @Column(name = "enemy_atk_buff")
-    private java.math.BigDecimal enemyAtkBuff; // 必须是 BigDecimal 才能存 1.20
+    // --- 新增：奖励与掉落逻辑字段 ---
+    private Integer goldReward;     // 通关金币奖励
+    private Integer diamondReward;  // 首通钻石奖励
+    private BigDecimal lootRate;    // 掉落率，对应数据库 0.10 这种格式
 }

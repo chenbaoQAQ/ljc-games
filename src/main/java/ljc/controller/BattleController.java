@@ -1,18 +1,15 @@
 package ljc.controller;
 
-import ljc.constant.DifficultyTier;
 import ljc.entity.StageConfig;
 import ljc.entity.UnitConfig;
 import ljc.model.Army;
 import ljc.repository.StageConfigRepository;
-import ljc.repository.UnitConfigRepository;
 import ljc.service.BattleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/battle")
@@ -24,28 +21,37 @@ public class BattleController {
     @Autowired
     private StageConfigRepository stageRepository;
 
-    @Autowired
-    private UnitConfigRepository unitRepository;
+    @GetMapping("/start")
+    public List<String> startBattle(
+            @RequestParam Integer userId,
+            @RequestParam Integer generalId,
+            @RequestParam Integer stageId) {
 
-    @GetMapping("/test/{stageId}")
-    public List<String> quickBattle(@PathVariable Integer stageId) {
-        // 1. 模拟环境：从数据库读关卡
-        StageConfig stage = stageRepository.findById(stageId)
-                .orElseThrow(() -> new RuntimeException("关卡不存在"));
+        try {
+            // 1. 获取关卡
+            StageConfig stage = stageRepository.findById(stageId)
+                    .orElseThrow(() -> new RuntimeException("找不到关卡ID: " + stageId));
 
-        // 2. 模拟玩家：创建一个带 1000 步兵的部队
-        Army playerArmy = new Army();
-        UnitConfig infantry = unitRepository.findByUnitName("INFANTRY")
-                .orElseThrow(() -> new RuntimeException("兵种不存在"));
-        playerArmy.getTroopMap().put(infantry, 1000);
+            // 2. 紧急组建一支演习部队
+            Army testArmy = new Army();
 
-        // 3. 模拟方案：如果是墙，全用步兵填
-        Map<UnitConfig, Integer> plan = new HashMap<>();
-        if (stage.getHasWall()) {
-            plan.put(infantry, 100);
+            // 模拟一个基础步兵配置
+            UnitConfig infantry = new UnitConfig();
+            infantry.setUnitName("INFANTRY"); // 必须匹配 Army.java 里的逻辑
+            infantry.setBaseAtk(15);
+
+            // 往部队里塞 100 名步兵
+            testArmy.getTroopMap().put(infantry, 100);
+
+            // 3. 开始战斗并返回日志
+            return battleService.conductBattle(userId, generalId, stage, testArmy);
+
+        } catch (Exception e) {
+            // 如果报错了，把错误信息打印在页面上，方便排查
+            List<String> errorLog = new ArrayList<>();
+            errorLog.add("【系统报错】: " + e.getMessage());
+            e.printStackTrace(); // 在 IDEA 控制台打印堆栈信息
+            return errorLog;
         }
-
-        // 4. 开始模拟战斗 (默认 HARD 难度)
-        return battleService.conductBattle(playerArmy, stage, DifficultyTier.HARD, plan);
     }
 }

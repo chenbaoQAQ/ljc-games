@@ -1,34 +1,25 @@
 package ljc.entity;
 
-import jakarta.persistence.*;
 import lombok.Data;
+import jakarta.persistence.*;
 
 @Data
 @Entity
 @Table(name = "user_general")
 public class UserGeneral {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "user_id")
-    private Integer userId; // 所属玩家ID
+    private Integer userId;
+    private Integer templateId; // 关联武将模版（如：赵云、关羽）
 
-    @Column(name = "template_id")
-    private Integer templateId; // 关联的武将模版ID（比如关联到赵云）
+    private String name;        // 武将姓名
+    private String personality; // 性格：BRAVE, CAUTIOUS, RASH, CALM
 
-    @Column(name = "personality")
-    private String personality; // 性格（影响战损的关键字段）
+    private Integer currentHp;  // 武将当前血量（判定受伤/阵亡）
+    private Integer maxHp;
 
-    @Column(name = "level")
-    private Integer level = 1; // 等级
-
-    @Column(name = "current_exp")
-    private Integer currentExp = 0; // 当前经验值
-
-    // UserGeneral.java 内部
-    @ManyToOne
-    @JoinColumn(name = "template_id", insertable = false, updatable = false)
-    private GeneralTemplate template; // 这一行就是那根“连接线”
+    // 状态枚举：HEALTHY(健康), WOUNDED(受伤), KILLED(阵亡)
+    private String status = "HEALTHY";
 }
