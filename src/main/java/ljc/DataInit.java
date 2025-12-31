@@ -37,7 +37,7 @@ public class DataInit implements CommandLineRunner {
         // 不再只是 isEmpty() 时插入，而是强制设置数值，确保数据库里永远是最全的
         StageConfig stage = stageRepo.findById(1).orElse(new StageConfig());
         stage.setId(1);
-        stage.setstageName("大鹿泽 (黄巾起义)");
+        stage.setStageName("大鹿泽 (黄巾起义)");
         stage.setEnemyBaseHp(500);      // 补齐血量
         stage.setGoldReward(100);       // 补齐金币
         stage.setDiamondReward(10);     // 补齐钻石
