@@ -9,5 +9,5 @@ import java.util.Optional;
 
 @Repository
 public interface StageConfigRepository extends JpaRepository<StageConfig, Integer> {
-    Optional<StageConfig> findByRegionName(String regionName);
+    Optional<StageConfig> findByStageName(String stageName);
 }
