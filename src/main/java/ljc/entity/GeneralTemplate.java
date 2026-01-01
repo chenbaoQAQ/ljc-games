@@ -12,7 +12,5 @@ public class GeneralTemplate {
     private String name;
     private Integer baseAtk;
     private Integer baseHp;
-
-    // --- 补上这个字段 ---
     private String rarity;
 }

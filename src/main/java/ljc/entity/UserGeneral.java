@@ -17,9 +17,26 @@ public class UserGeneral {
     private String name;        // 武将姓名
     private String personality; // 性格：BRAVE, CAUTIOUS, RASH, CALM
 
-    private Integer currentHp;  // 武将当前血量（判定受伤/阵亡）
-    private Integer maxHp;
+    private int maxHp = 1000;      // 最大血量
+    private int currentHp = 1000;  // 当前血量
+    private int currentArmyCount;  // 当前兵力人数
+    private String status = "HEALTHY"; // 状态：HEALTHY, WOUNDED, KILLED
 
-    // 状态枚举：HEALTHY(健康), WOUNDED(受伤), KILLED(阵亡)
-    private String status = "HEALTHY";
+    // 2. Getter 和 Setter 方法（这是 IDEA 识别 getCurrentHp 等指令的关键）
+
+    // 获取和设置血量
+    public int getCurrentHp() { return currentHp; }
+    public void setCurrentHp(int currentHp) { this.currentHp = currentHp; }
+
+    public int getMaxHp() { return maxHp; }
+    public void setMaxHp(int maxHp) { this.maxHp = maxHp; }
+
+    // 获取和设置兵力人数
+    public int getCurrentArmyCount() { return currentArmyCount; }
+    public void setCurrentArmyCount(int currentArmyCount) { this.currentArmyCount = currentArmyCount; }
+
+    // 获取和设置状态
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
 }

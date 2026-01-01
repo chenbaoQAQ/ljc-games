@@ -8,14 +8,13 @@ import java.util.List;
 @Component
 public class CombatEngine {
 
-    /**
-     * 计算最终战力：融合 兵力战力 + 装备加成 + 性格修正 + 伤病惩罚
-     */
+
     public double calculateFinalAtk(int armyBasePower, List<Equipment> equips, UserGeneral general) {
         // 1. 累加装备攻击加成
         int equipAtkBonus = 0;
         if (equips != null) {
             equipAtkBonus = equips.stream().mapToInt(Equipment::getAtkBonus).sum();
+            //mapToInt(Equipment::getAtkBonus).sum()从Equipment里面取AtkBonus累加
         }
 
         double totalBaseAtk = armyBasePower + equipAtkBonus;
@@ -26,7 +25,7 @@ public class CombatEngine {
         // 3. 获取状态惩罚系数
         double statusMod = 1.0;
         if ("WOUNDED".equals(general.getStatus())) {
-            statusMod = 0.8; // 受伤战力发挥 80%
+            statusMod = 0.9; // 受伤战力发挥 80%
         } else if ("KILLED".equals(general.getStatus())) {
             statusMod = 0.0; // 阵亡全军溃散
         }

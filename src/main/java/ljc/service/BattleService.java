@@ -14,85 +14,106 @@ import java.util.*;
 @Service
 public class BattleService {
     @Autowired
-    private EquipmentRepository equipmentRepository; // 补上这一行，消灭变量名红字
+    private EquipmentRepository equipmentRepository; // 装备库管理员
     @Autowired
-    private CombatEngine combatEngine; // 刚才写的数值修正引擎
+    private CombatEngine combatEngine; // 战斗数值引擎
     @Autowired
-    private LootService lootService;     // 装备掉落服务
+    private LootService lootService;     // 掉落策划师
     @Autowired
-    private UserProfileRepository userProfileRepository;
+    private UserProfileRepository userProfileRepository;//玩家档案管理员
     @Autowired
-    private UserGeneralRepository generalRepository;
+    private UserGeneralRepository generalRepository;//武将库管理员
 
     @Transactional
     public List<String> conductBattle(Integer userId, Integer generalId, StageConfig stage, Army army) {
         List<String> battleLog = new ArrayList<>();
 
-        // 1. 战前准备：加载武将与装备
+        // 1. 加载数据
         UserGeneral general = generalRepository.findById(generalId)
                 .orElseThrow(() -> new RuntimeException("找不到武将"));
         List<Equipment> equips = equipmentRepository.findByOwnerGeneralId(generalId);
-
-        battleLog.add(String.format("【出征】主将 [%s] (性格:%s) 领兵出战！",
-                general.getName(), general.getPersonality()));
-
-        // 2. 初始数据计算
-        int enemyHP = stage.getEnemyBaseHp();
+        int enemyHp = stage.getEnemyBaseHp();
         int round = 1;
         boolean isVictory = false;
 
-        // 3. 核心回合逻辑
-        while (army.getTotalUnitCount() > 0 && enemyHP > 0 && !general.getStatus().equals("KILLED")) {
-            // A. 动态计算玩家实时攻击力 (包含：实时人数、装备、性格、状态惩罚)
-            double currentAtk = combatEngine.calculateFinalAtk(army.calculateTotalPower(), equips, general);
+        battleLog.add(String.format("【开战】主将 [%s] 挺枪出马，当前兵力: %d", general.getName(), army.getTotalUnitCount()));
 
-            enemyHP -= (int)currentAtk;
-            battleLog.add(String.format("第%d回合: 玩家进攻造成 %d 伤害，敌方残余血量: %d",
-                    round, (int)currentAtk, Math.max(0, enemyHP)));
+        // ==========================================
+        // 阶段一：武将 PK 阶段 (前 3 回合或直到受伤)
+        // ==========================================
+        while (round <= 3 && general.getCurrentHp() > 0 && enemyHp > 0) {
+            battleLog.add("--- 第 " + round + " 回合：武将 PK ---");
 
-            if (enemyHP <= 0) {
-                isVictory = true;
-                break;
+            // 武将个人攻击 (不带小兵伤害)
+            double generalAtk = combatEngine.calculateGeneralOnlyAtk(general, equips);
+            enemyHp -= (int)generalAtk;
+            battleLog.add(String.format("[%s] 施展技能造成 %d 伤害，敌方血量: %d", general.getName(), (int)generalAtk, Math.max(0, enemyHp)));
+
+            // 敌方反击武将
+            int enemyCounterAtk = 100; // 假设敌方武将反击伤害
+            general.setCurrentHp(general.getCurrentHp() - enemyCounterAtk);
+
+            // --- 核心联动：80% 血量必受伤判定 ---
+            checkGeneralStatus(general, battleLog);
+
+            // 如果受伤了，根据你的需求：这里其实应该中断返回，让玩家选择是否 Round 2
+            if ("WOUNDED".equals(general.getStatus())) {
+                battleLog.add("【重要提示】主将已负伤！是否继续战斗？(此时撤退可保留残部)");
+                // 如果是真实业务，这里可能直接 return 战报，等待玩家在前端点击“继续”
             }
 
-            // B. 敌方反击与主将风险判定
-            int enemyAtk = (int)(stage.getEnemyAtkBuff().doubleValue() * 50); // 示例基础伤害
-            army.receiveDamage(enemyAtk); // 士兵受损
-
-            // 判定主将是否被流矢射中 (性格影响：暴躁性格更容易受伤)
-            checkGeneralStatus(general, enemyAtk, battleLog);
-
-            battleLog.add(String.format("第%d回合: 敌方反击，玩家兵力剩余: %d，主将状态: %s",
-                    round, army.getTotalUnitCount(), general.getStatus()));
-
             round++;
-            if (round > 50) break;
         }
 
-        // 4. 战后清算 (这是最关键的逻辑更新)
-        processPostBattle(userId, general, army, stage, isVictory, battleLog);
+        // ==========================================
+        // 阶段二：全军混战阶段 (如果武将还没阵亡且敌方还有血)
+        // ==========================================
+        if (!"KILLED".equals(general.getStatus()) && enemyHp > 0) {
+            battleLog.add("=== PK 结束，全军混战开始 ===");
 
+            while (army.getTotalUnitCount() > 0 && enemyHp > 0) {
+                // 此时计算总战力，用的 army 已经是被 checkGeneralStatus 扣除过 10% 或 50% 后的残部了
+                double totalAtk = combatEngine.calculateFinalAtk(army.calculateTotalPower(), equips, general);
+                enemyHp -= (int)totalAtk;
+
+                // 士兵对砍损耗
+                army.receiveDamage(50);
+
+                if (enemyHp <= 0) { isVictory = true; break; }
+                round++;
+                if (round > 50) break; // 防止死循环
+            }
+        }
+
+        // 4. 结算
+        processPostBattle(userId, general, army, stage, isVictory, battleLog);
         return battleLog;
     }
 
-    private void checkGeneralStatus(UserGeneral general, int enemyAtk, List<String> log) {
-        double injuryChance = (enemyAtk > 100) ? 0.15 : 0.05;
-        // 暴躁性格受伤概率翻倍
-        if ("RASH".equals(general.getPersonality())) injuryChance *= 2;
 
-        if (Math.random() < injuryChance) {
-            if ("HEALTHY".equals(general.getStatus())) {
-                general.setStatus("WOUNDED");
-                log.add("！！！【战报】主将受伤，战力下降 20%！");
-            } else if ("WOUNDED".equals(general.getStatus()) && Math.random() < 0.2) {
-                general.setStatus("KILLED");
-                log.add("！！！【噩耗】主将阵亡，全军溃散！");
-            }
+    private void checkGeneralStatus(UserGeneral general, List<String> log) {
+        double hpPercent = (double) general.getCurrentHp() / general.getMaxHp();
+
+        // 1. 80% 阈值必受伤 + 扣 10% 兵
+        if (hpPercent <= 0.8 && "HEALTHY".equals(general.getStatus())) {
+            general.setStatus("WOUNDED");
+            int loss = (int) (general.getCurrentArmyCount() * 0.1);
+            general.setCurrentArmyCount(general.getCurrentArmyCount() - loss);
+            log.add("！！！【战报】主将血量跌破 80%！负伤触发，士兵惊恐损失 10%！");
+        }
+
+        // 2. 0% 阈值判定阵亡 + 扣 50% 兵
+        if (general.getCurrentHp() <= 0 && !"KILLED".equals(general.getStatus())) {
+            general.setStatus("KILLED");
+            int loss = (int) (general.getCurrentArmyCount() * 0.5);
+            general.setCurrentArmyCount(general.getCurrentArmyCount() - loss);
+            log.add("！！！【惨剧】主将战死沙场！军队大溃散，损失 50% 兵力！");
         }
     }
-
+    //战后结算方法
     private void processPostBattle(Integer userId, UserGeneral general, Army army,
                                    StageConfig stage, boolean isVictory, List<String> log) {
+
         UserProfile user = userProfileRepository.findById(userId).get();
 
         if (isVictory) {
