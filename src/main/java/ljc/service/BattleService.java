@@ -11,9 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
-// 战斗指挥中心：处理从开战、单挑、混战到战后结算的完整业务闭环
+// 战斗指挥中心：负责调度武将单挑与全军集火混战
 public class BattleService {
     @Autowired
     private EquipmentRepository equipmentRepository;
@@ -30,41 +31,40 @@ public class BattleService {
     public List<String> conductBattle(Integer userId, Integer generalId, StageConfig stage, Army army) {
         List<String> battleLog = new ArrayList<>();
 
-        // 1. 初始化数据：加载武将、装备与敌军血量
+        // 1. 初始化数据
         UserGeneral general = generalRepository.findById(generalId)
                 .orElseThrow(() -> new RuntimeException("找不到武将"));
         List<Equipment> equips = equipmentRepository.findByOwnerGeneralId(generalId);
 
-        // 预处理：如果是初次战斗，同步武将状态
-        general.setCurrentArmyCount(army.getTotalUnitCount());
-
+        // 获取关卡主要的敌人类型（用于克制判定）
+        // 注意：如果 StageConfig 报红，请看下方的“补充建议”
+        String enemyType = stage.getMainEnemyType() != null ? stage.getMainEnemyType() : "INFANTRY";
         int enemyHp = stage.getEnemyBaseHp();
         int round = 1;
         boolean isVictory = false;
 
-        battleLog.add(String.format("【出征】主将 [%s] (Lv.%d) 领兵出战！当前总兵力: %d",
-                general.getName(), general.getLevel(), army.getTotalUnitCount()));
+        battleLog.add(String.format("【开战】主将 [%s] 挺枪出马，当前兵力: %d (敌方主力: %s)",
+                general.getName(), army.getTotalUnitCount(), enemyType));
 
         // ==========================================
         // 阶段一：武将 PK 阶段 (前 3 回合)
-        // 此阶段仅看武将个人勇武与技能触发
         // ==========================================
         while (round <= 3 && general.getCurrentHp() > 0 && enemyHp > 0) {
-            battleLog.add("--- 第 " + round + " 回合：武将 PK ---");
+            battleLog.add("--- 第 " + round + " 回合：武将单挑 ---");
 
-            // 武将个人攻击判定（包含技能触发逻辑）
+            // 武将个人攻击 (包含技能触发判定)
             double pkAtk = combatEngine.calculatePKDamage(general, equips, battleLog);
             enemyHp -= (int)pkAtk;
-            battleLog.add(String.format("[%s] 发起进攻造成 %d 伤害，敌方血量残余: %d",
+            battleLog.add(String.format("[%s] 进攻造成 %d 伤害，敌方血量: %d",
                     general.getName(), (int)pkAtk, Math.max(0, enemyHp)));
 
             if (enemyHp <= 0) break;
 
-            // 敌方反击武将（示例：固定伤害或基于关卡强度）
-            int enemyCounterAtk = (int)(100 * stage.getEnemyAtkBuff().doubleValue());
+            // 敌方反击武将
+            int enemyCounterAtk = 100;
             general.setCurrentHp(general.getCurrentHp() - enemyCounterAtk);
 
-            // 核心判定：检查武将健康度与实时兵力损耗联动
+            // 检查武将状态（此时需要传入 army 以同步扣除逃逸士兵）
             checkGeneralStatus(general, army, battleLog);
 
             if ("KILLED".equals(general.getStatus())) break;
@@ -72,118 +72,112 @@ public class BattleService {
         }
 
         // ==========================================
-        // 阶段二：全军混战阶段 (若敌我皆在，则开启全面冲突)
-        // 此阶段武将作为加成点，小兵为主要输出
+        // 阶段二：全军混战 (波次序列：特种加持 -> 弓 -> 步 -> 骑 -> 特)
         // ==========================================
         if (!"KILLED".equals(general.getStatus()) && enemyHp > 0 && army.getTotalUnitCount() > 0) {
-            battleLog.add("=== 混战开始：全军压上！ ===");
+            battleLog.add("=== 进入混战阶段：执行战法序列 ===");
 
             while (army.getTotalUnitCount() > 0 && enemyHp > 0) {
-                // 计算全军总战力（已包含特种兵强化逻辑与性格修正）
-                double totalAtk = combatEngine.calculateFinalAtk(army.calculateTotalPower(), equips, general);
-                enemyHp -= (int)totalAtk;
+                battleLog.add("--- 第 " + round + " 回合：全军冲锋 ---");
 
-                battleLog.add(String.format("第%d回合: 全军猛攻造成 %d 伤害，敌方剩余: %d",
-                        round, (int)totalAtk, Math.max(0, enemyHp)));
+                // 1. 计算特种兵加持额度
+                Map<String, Integer> buffs = army.calculateSpecialBuffs();
 
-                if (enemyHp <= 0) { isVictory = true; break; }
-
-                // 敌方反击小兵
-                int enemyToArmyAtk = (int)(200 * stage.getEnemyAtkBuff().doubleValue());
-                army.receiveDamage(enemyToArmyAtk);
-
-                // 混战中主将亦有风险（20%概率被流矢射中）
-                if (Math.random() < 0.2) {
-                    general.setCurrentHp(general.getCurrentHp() - 50);
-                    checkGeneralStatus(general, army, battleLog);
+                // 2. 弓兵波次：判定是否优先集火
+                if (combatEngine.getAttackPriority("ARCHER", enemyType) >= 100) {
+                    battleLog.add(">> [战术] 弓兵部队发现敌方克制单位，正在进行优先集火...");
                 }
+                int archerDmg = army.getUnitAttackPower("ARCHER", enemyType, buffs.getOrDefault("ARCHER", 0), combatEngine);
+                enemyHp -= archerDmg;
+                if(archerDmg > 0) battleLog.add(String.format(">> 弓兵齐射：造成 %d 伤害 %s",
+                        archerDmg, combatEngine.isCounter("ARCHER", enemyType) ? "【克制★】" : ""));
 
-                if ("KILLED".equals(general.getStatus())) break;
+                // 3. 步兵(剑)波次
+                int infantryDmg = army.getUnitAttackPower("INFANTRY", enemyType, buffs.getOrDefault("INFANTRY", 0), combatEngine);
+                enemyHp -= infantryDmg;
+                if(infantryDmg > 0) battleLog.add(String.format(">> 步兵推进：造成 %d 伤害 %s",
+                        infantryDmg, combatEngine.isCounter("INFANTRY", enemyType) ? "【克制★】" : ""));
+
+                // 4. 骑兵波次
+                int cavalryDmg = army.getUnitAttackPower("CAVALRY", enemyType, buffs.getOrDefault("CAVALRY", 0), combatEngine);
+                enemyHp -= cavalryDmg;
+                if(cavalryDmg > 0) battleLog.add(String.format(">> 骑兵冲锋：造成 %d 伤害 %s",
+                        cavalryDmg, combatEngine.isCounter("CAVALRY", enemyType) ? "【克制★】" : ""));
+
+                // 5. 特种兵自身输出（收割波次）
+                int specialDmg = army.getSpecialUnitPersonalAttack(combatEngine);
+                enemyHp -= specialDmg;
+                if(specialDmg > 0) battleLog.add(String.format(">> 特种兵袭杀：造成 %d 额外伤害", specialDmg));
+
+                if (enemyHp <= 0) break;
+
+                // 敌方反击 (分摊战损)
+                army.receiveDamage(200);
 
                 round++;
-                if (round > 50) break; // 战斗时长上限
+                if (round > 50) break; // 防止死循环
             }
         }
 
         if (enemyHp <= 0) isVictory = true;
 
-        // 4. 战后清算：发放资源、更新等级、保存持久化数据
+        // 3. 战后清算
         processPostBattle(userId, general, army, stage, isVictory, battleLog);
-
         return battleLog;
     }
 
     /**
-     * 健康检查：血量跌破阈值时同步扣除兵力，体现“主将负伤，军心涣散”
+     * 健康检查：主将受伤会导致士兵逃逸
      */
     private void checkGeneralStatus(UserGeneral general, Army army, List<String> log) {
         double hpPercent = (double) general.getCurrentHp() / general.getMaxHp();
 
-        // 1. 负伤判定：80% 阈值
+        // 1. 80% 阈值必受伤 + 扣 10% 兵
         if (hpPercent <= 0.8 && "HEALTHY".equals(general.getStatus())) {
             general.setStatus("WOUNDED");
-            // 兵力由于恐慌瞬间损失 10%
             int loss = (int) (army.getTotalUnitCount() * 0.1);
-            army.receiveDamage(loss);
-            general.setCurrentArmyCount(army.getTotalUnitCount());
-            log.add("！！！【惊恐】主将负伤！全军士气受损，士兵溃逃 10%！");
+            army.receiveDamage(loss); // 真实扣除 Army 里的士兵
+            general.setCurrentArmyCount(army.getTotalUnitCount()); // 同步数值
+            log.add("！！！【战报】主将血量跌破 80%！负伤触发，士兵惊恐损失 10%！");
         }
 
-        // 2. 阵亡判定：0 阈值
+        // 2. 0% 阈值判定阵亡 + 扣 50% 兵
         if (general.getCurrentHp() <= 0 && !"KILLED".equals(general.getStatus())) {
             general.setStatus("KILLED");
             general.setCurrentHp(0);
-            // 主将战死，军队大溃散损失 50%
             int loss = (int) (army.getTotalUnitCount() * 0.5);
             army.receiveDamage(loss);
             general.setCurrentArmyCount(army.getTotalUnitCount());
-            log.add("！！！【悲剧】主将战死沙场！军队发生大规模溃散，损失 50% 兵力！");
+            log.add("！！！【惨剧】主将战死沙场！军队发生大溃散，损失 50% 兵力！");
         }
     }
 
     /**
-     * 战后结算：处理升级、金币、掉落、伤兵回收
+     * 战后结算
      */
     private void processPostBattle(Integer userId, UserGeneral general, Army army,
                                    StageConfig stage, boolean isVictory, List<String> log) {
 
-        UserProfile user = userProfileRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("找不到玩家档案"));
+        UserProfile user = userProfileRepository.findById(userId).get();
 
         if (isVictory) {
-            log.add("--- 战斗胜利：凯旋归来 ---");
-
-            // 1. 兵力恢复：胜利可救回 70% 伤兵
+            log.add("--- 战斗胜利 ---");
             army.recoverTroops(0.7);
-
-            // 2. 奖励发放
             user.setGold(user.getGold() + stage.getGoldReward());
-            if (stage.getDiamondReward() != null) {
-                user.setDiamond(user.getDiamond() + stage.getDiamondReward());
-            }
 
-            // 3. 武将经验与等级提升
-            int expGain = 50;
-            general.setCurrentExp(general.getCurrentExp() + expGain);
-            log.add(String.format("【成长】%s 获得了 %d 点经验！", general.getName(), expGain));
-
-            // 升级逻辑：每 100 经验一级，提升 HP 并回满
+            // 经验与升级逻辑
+            general.setCurrentExp(general.getCurrentExp() + 50);
             if (general.getCurrentExp() >= 100) {
                 general.setLevel(general.getLevel() + 1);
-                general.setMaxHp(general.getMaxHp() + 50);
-                general.setCurrentHp(general.getMaxHp()); // 升级即回满血
+                general.setMaxHp(general.getMaxHp() + 100);
+                general.setCurrentHp(general.getMaxHp()); // 升级回满
                 general.setCurrentExp(0);
-                log.add(String.format("【升级】叮！等级提升至 Lv.%d，最大血量增加 50，已回满状态！", general.getLevel()));
+                log.add(">> [升级] 武将提升至 Lv." + general.getLevel());
             }
-
-            // 4. 触发掉落
             log.add(lootService.dropEquipment(userId, stage));
-
         } else {
-            log.add("--- 战斗失败：残部撤退 ---");
-            // 失败仅能救回 20%
+            log.add("--- 战斗失败 ---");
             army.recoverTroops(0.2);
-            // 若主将战死，剩余兵力也要归零或重置（根据企划定）
             if ("KILLED".equals(general.getStatus())) {
                 army.clearTroops();
             }
@@ -192,7 +186,6 @@ public class BattleService {
         // 同步逻辑兵力数
         general.setCurrentArmyCount(army.getTotalUnitCount());
 
-        // 持久化保存
         userProfileRepository.save(user);
         generalRepository.save(general);
     }
