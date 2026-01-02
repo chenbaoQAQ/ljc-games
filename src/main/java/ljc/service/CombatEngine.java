@@ -7,32 +7,72 @@ import java.util.List;
 import java.util.Random;
 
 @Component
-/**
- * 补全后的数值引擎：
- * 1. 支持武器（ATK）、防具（HP）、兵符（LEADERSHIP）全装备加成。
- * 2. 区分单挑（PK）与大军混战的计算逻辑。
- * 3. 引入性格对概率事件的微调。
- */
 public class CombatEngine {
 
     private final Random random = new Random();
 
-    // 计算全军混合伤害
-    public double calculateFinalAtk(int armyBasePower, List<Equipment> equips, UserGeneral general) {
-        // 1. 汇总装备攻击加成
-        int equipAtkBonus = equips.stream()
-                .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
-                .mapToInt(Equipment::getAtkBonus).sum();
+    /**
+     * 计算特定兵种对特定敌人的最终伤害
+     * @param baseAtk 兵种基础攻击
+     * @param unitType 攻击方类型
+     * @param enemyType 防御方类型
+     * @param isBuffed 是否受到特种兵加持
+     */
+    public double calculateUnitDamage(int baseAtk, String unitType, String enemyType, boolean isBuffed) {
+        double damage = baseAtk;
 
-        double totalBaseAtk = armyBasePower + equipAtkBonus;
+        // 1. 特种兵加拐逻辑 (攻击力 x2)
+        if (isBuffed) damage *= 2.0;
 
-        // 2. 系数叠加：性格系数 * 状态惩罚
-        double mods = getPersonalityModifier(general.getPersonality()) * getStatusModifier(general.getStatus());
+        // 2. 兵种克制逻辑 (Double Damage)
+        // 规则：INFANTRY -> ARCHER -> CAVALRY -> INFANTRY
+        if (isCounter(unitType, enemyType)) {
+            damage *= 2.0;
+        }
 
-        return totalBaseAtk * mods;
+        return damage;
     }
 
-    // 计算武将单挑伤害（PK阶段）
+    /**
+     * 💡 核心新增：目标优先级判定
+     * 返回值越高，代表攻击欲望越强。例如：弓兵对骑兵会返回最高优先级。
+     */
+    public int getAttackPriority(String attacker, String victim) {
+        if (attacker == null || victim == null) return 0;
+
+        // 优先攻击被自己克制的兵种（收益最大化）
+        if (isCounter(attacker, victim)) {
+            return 100; // 最高优先级
+        }
+
+        // 其次攻击同等级或中立兵种
+        if (attacker.equals(victim)) {
+            return 50;
+        }
+
+        // 最后才去啃那些克制自己的“硬骨头”
+        if (isCounter(victim, attacker)) {
+            return 10;
+        }
+
+        return 30;
+    }
+
+    /**
+     * 判定克制关系
+     */
+    public boolean isCounter(String attacker, String victim) {
+        if (attacker == null || victim == null) return false;
+        // 步兵克弓兵
+        if (attacker.equals("INFANTRY") && victim.equals("ARCHER")) return true;
+        // 弓兵克骑兵
+        if (attacker.equals("ARCHER") && victim.equals("CAVALRY")) return true;
+        // 骑兵克步兵
+        if (attacker.equals("CAVALRY") && victim.equals("INFANTRY")) return true;
+        return false;
+    }
+
+    // 武将 PK 逻辑保留并增强
     public double calculatePKDamage(UserGeneral general, List<Equipment> equips, List<String> log) {
         int weaponAtk = equips.stream()
                 .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
@@ -41,34 +81,25 @@ public class CombatEngine {
         double atkBase = general.getBaseAtk() + weaponAtk;
         double damage = atkBase * getPersonalityModifier(general.getPersonality()) * getStatusModifier(general.getStatus());
 
-        // 技能触发：暴躁性格额外增加 5% 触发率
-        double triggerChance = general.getSkillTriggerChance();
-        if ("RASH".equals(general.getPersonality())) triggerChance += 0.05;
-
-        if (random.nextDouble() < triggerChance) {
+        if (random.nextDouble() < general.getSkillTriggerChance()) {
             damage *= general.getSkillDamageRatio();
-            log.add(String.format("★★★【技能】%s 爆发大招 [%s]！造成了 %.0f 伤害！",
-                    general.getName(), general.getActiveSkillName(), damage));
+            log.add(String.format("★★★【技能】%s 爆发技能 [%s]！", general.getName(), general.getActiveSkillName()));
         }
-
         return damage;
     }
 
-    // 状态修正
-    private double getStatusModifier(String status) {
-        if ("WOUNDED".equals(status)) return 0.85; // 受伤下降 15% 战力
+    public double getStatusModifier(String status) {
+        if ("WOUNDED".equals(status)) return 0.85;
         if ("KILLED".equals(status)) return 0.0;
         return 1.0;
     }
 
-    // 性格修正
-    private double getPersonalityModifier(String personality) {
+    public double getPersonalityModifier(String personality) {
         if (personality == null) return 1.0;
         return switch (personality) {
-            case "BRAVE" -> 1.15; // 勇敢：纯伤害高
-            case "RASH" -> 1.25;  // 暴躁：伤害最高但容易受伤（由Service处理概率）
-            case "CALM" -> 1.05;  // 冷静：稳健发挥
-            case "CAUTIOUS" -> 1.0; // 谨慎：无伤害加成但有防御潜力
+            case "BRAVE" -> 1.15;
+            case "RASH" -> 1.25;
+            case "CALM" -> 1.05;
             default -> 1.0;
         };
     }
