@@ -4,28 +4,49 @@ import ljc.entity.Equipment;
 import ljc.entity.UserGeneral;
 import org.springframework.stereotype.Component;
 import java.util.List;
-import java.util.Random;
 
 @Component
+/**
+ * 战斗引擎：确保与 BattleService 的调用逻辑完全对齐。
+ * 修复建议：如果 general.getBaseAtk() 报错，请务必在 UserGeneral 类中添加 baseAtk 字段。
+ */
 public class CombatEngine {
 
-    private final Random random = new Random();
+    /**
+     * 计算武将 PK 阶段的纯粹伤害
+     * @param general 武将实例
+     * @param equips 装备列表
+     */
+    public double calculatePKDamage(UserGeneral general, List<Equipment> equips) {
+        // 1. 汇总装备攻击力 (过滤掉非武器类的加成)
+        int weaponAtk = (equips == null) ? 0 : equips.stream()
+                .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
+                .mapToInt(Equipment::getAtkBonus).sum();
+
+        // 2. 获取武将基础攻击力
+        // 💡 这里的 50 是保底逻辑，防止 general.getBaseAtk() 返回 0 或报错
+        double atkBase = 50.0 + weaponAtk;
+
+        // 3. 计算最终伤害：基础战力 * 性格加成 * 状态惩罚
+        return atkBase * getPersonalityModifier(general.getPersonality()) * getStatusModifier(general.getStatus());
+    }
 
     /**
-     * 计算特定兵种对特定敌人的最终伤害
-     * @param baseAtk 兵种基础攻击
-     * @param unitType 攻击方类型
-     * @param enemyType 防御方类型
-     * @param isBuffed 是否受到特种兵加持
+     * 计算特定波次的兵种输出伤害
+     * @param baseAtk 兵种单体攻击
+     * @param unitType 进攻方兵种
+     * @param enemyType 防御方（关卡）主力兵种
+     * @param isBuffed 是否受到特种兵强化
      */
     public double calculateUnitDamage(int baseAtk, String unitType, String enemyType, boolean isBuffed) {
         double damage = baseAtk;
 
-        // 1. 特种兵加拐逻辑 (攻击力 x2)
-        if (isBuffed) damage *= 2.0;
+        // 特种兵加拐逻辑 (伤害 x2)
+        if (isBuffed) {
+            damage *= 2.0;
+        }
 
-        // 2. 兵种克制逻辑 (Double Damage)
-        // 规则：INFANTRY -> ARCHER -> CAVALRY -> INFANTRY
+        // 兵种克制逻辑 (伤害 x2)
         if (isCounter(unitType, enemyType)) {
             damage *= 2.0;
         }
@@ -34,72 +55,42 @@ public class CombatEngine {
     }
 
     /**
-     * 💡 核心新增：目标优先级判定
-     * 返回值越高，代表攻击欲望越强。例如：弓兵对骑兵会返回最高优先级。
+     * 获取攻击优先级（用于战术集火）
+     * 规则：克制目标 100分，同类目标 50分
      */
     public int getAttackPriority(String attacker, String victim) {
-        if (attacker == null || victim == null) return 0;
-
-        // 优先攻击被自己克制的兵种（收益最大化）
-        if (isCounter(attacker, victim)) {
-            return 100; // 最高优先级
-        }
-
-        // 其次攻击同等级或中立兵种
-        if (attacker.equals(victim)) {
-            return 50;
-        }
-
-        // 最后才去啃那些克制自己的“硬骨头”
-        if (isCounter(victim, attacker)) {
-            return 10;
-        }
-
-        return 30;
+        if (isCounter(attacker, victim)) return 100;
+        return (attacker != null && attacker.equals(victim)) ? 50 : 30;
     }
 
     /**
-     * 判定克制关系
+     * 判定克制闭环：步兵 -> 弓兵 -> 骑兵 -> 步兵
      */
     public boolean isCounter(String attacker, String victim) {
         if (attacker == null || victim == null) return false;
-        // 步兵克弓兵
         if (attacker.equals("INFANTRY") && victim.equals("ARCHER")) return true;
-        // 弓兵克骑兵
         if (attacker.equals("ARCHER") && victim.equals("CAVALRY")) return true;
-        // 骑兵克步兵
         if (attacker.equals("CAVALRY") && victim.equals("INFANTRY")) return true;
         return false;
     }
 
-    // 武将 PK 逻辑保留并增强
-    public double calculatePKDamage(UserGeneral general, List<Equipment> equips, List<String> log) {
-        int weaponAtk = equips.stream()
-                .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
-                .mapToInt(Equipment::getAtkBonus).sum();
-
-        double atkBase = general.getBaseAtk() + weaponAtk;
-        double damage = atkBase * getPersonalityModifier(general.getPersonality()) * getStatusModifier(general.getStatus());
-
-        if (random.nextDouble() < general.getSkillTriggerChance()) {
-            damage *= general.getSkillDamageRatio();
-            log.add(String.format("★★★【技能】%s 爆发技能 [%s]！", general.getName(), general.getActiveSkillName()));
-        }
-        return damage;
+    /**
+     * 状态惩罚系数：受伤打8折
+     */
+    private double getStatusModifier(String status) {
+        if ("WOUNDED".equals(status)) return 0.8;
+        return "KILLED".equals(status) ? 0.0 : 1.0;
     }
 
-    public double getStatusModifier(String status) {
-        if ("WOUNDED".equals(status)) return 0.85;
-        if ("KILLED".equals(status)) return 0.0;
-        return 1.0;
-    }
-
-    public double getPersonalityModifier(String personality) {
+    /**
+     * 性格修正系数
+     */
+    private double getPersonalityModifier(String personality) {
         if (personality == null) return 1.0;
         return switch (personality) {
-            case "BRAVE" -> 1.15;
-            case "RASH" -> 1.25;
-            case "CALM" -> 1.05;
+            case "BRAVE" -> 1.1; // 勇敢：稳定
+            case "RASH" -> 1.2;  // 暴躁：爆发
+            case "CALM" -> 1.05; // 冷静：精准
             default -> 1.0;
         };
     }

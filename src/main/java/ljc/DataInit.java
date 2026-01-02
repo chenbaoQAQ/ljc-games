@@ -6,10 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
-import java.util.Optional;
 
 @Component
-// 数据初始化：为系统注入测试用的“全量”数据
+/**
+ * 系统初始化：为项目注入全量测试数据
+ * 确保所有字段（包括新增的 mainEnemyType 和 baseAtk）都有初始值，防止运行报错。
+ */
 public class DataInit implements CommandLineRunner {
 
     @Autowired private StageConfigRepository stageRepo;
@@ -20,85 +22,83 @@ public class DataInit implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        System.out.println(">>> [系统初始化] 开始注入适配新版本的战斗数据...");
+        System.out.println(">>> [系统初始化] 正在同步战术版本测试数据...");
 
-        // --- 1. 初始化兵种配置 (UnitConfig) ---
-        // 这是计算特种兵加成的核心，必须先有这些数据
+        // --- 1. 兵种配置初始化 (UnitConfig) ---
+        // 包含基础兵种和四国特种兵
         initUnit("INFANTRY", 1, 15, 100, "NONE", 1.0);
         initUnit("ARCHER", 1, 20, 80, "NONE", 1.0);
         initUnit("CAVALRY", 2, 40, 200, "NONE", 1.0);
-        initUnit("CN_SPECIAL", 3, 30, 250, "INFANTRY", 2.0); // 步兵统领
 
-        // --- 2. 创建武将模板 (GeneralTemplate) ---
+        // 特种兵：CN强化步兵，JP强化弓兵，KR强化骑兵，EN强化武将
+        initUnit("CN_SPECIAL", 3, 30, 250, "INFANTRY", 2.0);
+        initUnit("JP_SPECIAL", 3, 35, 200, "ARCHER", 2.0);
+        initUnit("KR_SPECIAL", 3, 45, 300, "CAVALRY", 2.0);
+        initUnit("EN_SPECIAL", 3, 25, 400, "HERO", 0.2);
+
+        // --- 2. 武将模板初始化 (GeneralTemplate) ---
         if (templateRepo.findById(101).isEmpty()) {
             GeneralTemplate t = new GeneralTemplate();
             t.setId(101);
             t.setName("五虎上将模板");
             t.setBaseAtk(60);
-            t.setBaseHp(1500); // 模板血量给高一点
+            t.setBaseHp(1500);
             t.setRarity("SSR");
             templateRepo.save(t);
-            System.out.println(">>> [模板] 赵云所属模板已创建");
         }
 
-        // --- 3. 初始化关卡配置 (StageConfig) ---
-        // 增加奖励和掉落率
-        StageConfig stage = stageRepo.findById(1).orElse(new StageConfig());
-        stage.setId(1);
-        stage.setStageName("大鹿泽 (首战黄巾)");
-        stage.setEnemyBaseHp(2000); // 提高敌人血量，让战斗能打满3回合PK
-        stage.setGoldReward(500);
-        stage.setDiamondReward(20);
-        stage.setLootRate(BigDecimal.valueOf(0.3)); // 30% 掉宝率
-        stage.setEnemyAtkBuff(BigDecimal.valueOf(1.0)); // 1倍难度
-        stageRepo.save(stage);
-        System.out.println(">>> [关卡] 初始关卡数据已同步");
-
-        // --- 4. 初始化玩家存档 (UserProfile) ---
+        // --- 3. 玩家存档初始化 (UserProfile) ---
         if (profileRepo.findById(1).isEmpty()) {
             UserProfile p = new UserProfile();
             p.setUserId(1);
-            p.setGold(2000); // 给点初始资金招兵
-            p.setDiamond(100);
-            p.setUnlockedCountries("CN");
+            p.setGold(5000); // 初始金币多给点，方便测试
+            p.setDiamond(200);
+            p.setUnlockedCountries("CN,JP,KR,EN");
             profileRepo.save(p);
-            System.out.println(">>> [玩家] 存档已建立");
         }
 
-        // --- 5. 初始化测试武将 (UserGeneral) ---
-        // 补全所有新字段：技能、实时血量、等级
+        // --- 4. 战术关卡初始化 (StageConfig) ---
+        // 💡 重点：我们将第一关设定为骑兵主力，测试你的弓兵集火！
+        StageConfig stage = stageRepo.findById(1).orElse(new StageConfig());
+        stage.setId(1);
+        stage.setStageName("大鹿泽 (铁骑突袭)");
+        stage.setEnemyBaseHp(3000);      // 提高血量，让混战打得久一点
+        stage.setMainEnemyType("CAVALRY"); // 敌军主力：骑兵
+        stage.setGoldReward(500);
+        stage.setDiamondReward(50);
+        stage.setLootRate(BigDecimal.valueOf(0.5));
+        stage.setEnemyAtkBuff(BigDecimal.valueOf(1.0));
+        stageRepo.save(stage);
+
+        // --- 5. 测试武将初始化 (UserGeneral) ---
+        // 💡 重点：补全 baseAtk 和实时血量，防止 CombatEngine 报错
         if (generalRepo.findById(1).isEmpty()) {
             UserGeneral g = new UserGeneral();
             g.setId(1);
             g.setName("赵云");
             g.setTemplateId(101);
             g.setUserId(1);
-            g.setPersonality("BRAVE");
+            g.setPersonality("BRAVE"); // 勇敢性格：伤害加成
             g.setStatus("HEALTHY");
 
-            // 重要：同步血量数值，不要再给100了
+            // 数值同步
             g.setBaseAtk(60);
             g.setBaseHp(1500);
             g.setMaxHp(1500);
             g.setCurrentHp(1500);
-
-            // 初始技能设定
-            g.setActiveSkillName("七进七出");
-            g.setSkillDamageRatio(2.0); // 2倍伤害
-            g.setSkillTriggerChance(0.3); // 30% 概率
-
             g.setLevel(1);
             g.setCurrentExp(0);
-            g.setCurrentArmyCount(200); // 初始带200兵
+            g.setCurrentArmyCount(300); // 初始带300兵
 
             generalRepo.save(g);
-            System.out.println(">>> [武将] 赵云已全副武装就绪！");
         }
 
-        System.out.println(">>> [系统初始化] 全部绿色通过！策划大人可以开战了。");
+        System.out.println(">>> [系统初始化] 数据注入完成！策划大人可以启动战斗测试了。");
     }
 
-    // 辅助方法：快速初始化兵种
+    /**
+     * 兵种初始化辅助方法
+     */
     private void initUnit(String name, int cost, int atk, int hp, String target, double ratio) {
         if (unitRepo.findByUnitName(name).isEmpty()) {
             UnitConfig u = new UnitConfig();
@@ -109,7 +109,7 @@ public class DataInit implements CommandLineRunner {
             u.setTargetType(target);
             u.setBuffRatio(BigDecimal.valueOf(ratio));
             unitRepo.save(u);
-            System.out.println(">>> [兵种] " + name + " 配置已加载");
+            System.out.println(">> [兵种配置] 已加载: " + name);
         }
     }
 }
