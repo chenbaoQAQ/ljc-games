@@ -13,22 +13,33 @@ import java.util.List;
 public class CombatEngine {
 
     /**
-     * 计算武将 PK 阶段的纯粹伤害
+     * 计算武将 PK 阶段的最终伤害
      * @param general 武将实例
      * @param equips 装备列表
+     * @param heroBuffCount 英雄流加持次数（由 Army.calculateHeroBuffCount() 计算得出）
      */
-    public double calculatePKDamage(UserGeneral general, List<Equipment> equips) {
-        // 1. 汇总装备攻击力 (过滤掉非武器类的加成)
+    public double calculatePKDamage(UserGeneral general, List<Equipment> equips, int heroBuffCount) {
+        // 1. 汇总装备攻击力 (过滤非武器加成)
         int weaponAtk = (equips == null) ? 0 : equips.stream()
                 .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
                 .mapToInt(Equipment::getAtkBonus).sum();
 
-        // 2. 获取武将基础攻击力
-        // 💡 这里的 50 是保底逻辑，防止 general.getBaseAtk() 返回 0 或报错
-        double atkBase = 50.0 + weaponAtk;
+        // 2. 获取武将基础攻击力 (增加 baseAtk 字段支持)
+        double atkBase = general.getBaseAtk() + weaponAtk;
 
-        // 3. 计算最终伤害：基础战力 * 性格加成 * 状态惩罚
-        return atkBase * getPersonalityModifier(general.getPersonality()) * getStatusModifier(general.getStatus());
+        // 3. 计算性格加成与状态惩罚
+        double personalityMod = getPersonalityModifier(general.getPersonality());
+        double statusMod = getStatusModifier(general.getStatus());
+        double finalDamage = atkBase * personalityMod * statusMod;
+
+        // 4. 【补全】英国特种兵“英雄流”加成逻辑
+        // 规则：每 5 个亲卫加持 1 次，每次提供额外的固定伤害，并受性格系数微调
+        if (heroBuffCount > 0) {
+            double extraDamage = heroBuffCount * 10.0 * personalityMod;
+            finalDamage += extraDamage;
+        }
+
+        return finalDamage;
     }
 
     /**

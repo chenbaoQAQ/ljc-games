@@ -28,6 +28,15 @@ public class Army {
         }
         return buffs;
     }
+    //特种兵提供英雄buff
+    public int calculateHeroBuffCount() {
+        for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
+            if ("EN_SPECIAL".equals(entry.getKey().getUnitName())) {
+                return entry.getValue() / 5; // 每5个加持1次
+            }
+        }
+        return 0;
+    }
 
     // 获取特定兵种波次的实时伤害
     public int getUnitAttackPower(String targetUnitName, String enemyType, int buffQuota, CombatEngine engine) {

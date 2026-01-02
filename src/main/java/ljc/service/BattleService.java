@@ -42,8 +42,14 @@ public class BattleService {
         while (round <= 3 && general.getCurrentHp() > 0 && enemyHp > 0) {
             battleLog.add("--- 第 " + round + " 回合：武将 PK ---");
 
-            // 计算武将伤害 (包含性格加成与状态惩罚)
-            double damage = combatEngine.calculatePKDamage(general, equips);
+            // --- 补全：检测英国特种兵加持 (英雄流) ---
+            int heroBuffs = army.calculateHeroBuffCount(); // 调用 Army 模型中的统计方法
+            if (heroBuffs > 0) {
+                battleLog.add(String.format(">> [王室亲卫] 提供 %d 次力量加持，武将单挑伤害大幅提升！", heroBuffs));
+            }
+
+            // 计算武将伤害 (传入英雄流加持次数)
+            double damage = combatEngine.calculatePKDamage(general, equips, heroBuffs);
             enemyHp -= (int)damage;
 
             // 敌方固定反击 (可根据 stage.enemyAtkBuff 动态调整)
@@ -132,13 +138,8 @@ public class BattleService {
         return battleLog;
     }
 
-    /**
-     * 实时监控主将生命值：触发受伤/阵亡带来的连锁兵力损失
-     */
     private void checkGeneralStatus(UserGeneral general, Army army, List<String> log) {
         double hpPercent = (double) general.getCurrentHp() / general.getMaxHp();
-
-        // 80% 触发负伤：损失 10% 现有兵力
         if (hpPercent <= 0.8 && "HEALTHY".equals(general.getStatus())) {
             general.setStatus("WOUNDED");
             int loss = (int) (army.getTotalUnitCount() * 0.1);
@@ -146,8 +147,6 @@ public class BattleService {
             general.setCurrentArmyCount(army.getTotalUnitCount());
             log.add("！！！主将负伤！士气大跌，士兵恐慌性损失 10%！");
         }
-
-        // 0% 触发阵亡：损失 50% 现有兵力
         if (general.getCurrentHp() <= 0 && !"KILLED".equals(general.getStatus())) {
             general.setStatus("KILLED");
             general.setCurrentHp(0);
@@ -158,47 +157,30 @@ public class BattleService {
         }
     }
 
-    /**
-     * 战后清算逻辑
-     */
     private void processPostBattle(Integer userId, UserGeneral general, Army army,
                                    StageConfig stage, boolean isVictory, List<String> log) {
         UserProfile user = userProfileRepository.findById(userId).get();
-
         if (isVictory) {
             log.add("--- 战役胜利：凯旋而归 ---");
-            // 恢复 70% 伤兵
             army.recoverTroops(0.7);
-
-            // 奖励发放
             user.setGold(user.getGold() + stage.getGoldReward());
-
-            // 经验与升级判定
             general.setCurrentExp(general.getCurrentExp() + 50);
             if (general.getCurrentExp() >= 100) {
                 general.setLevel(general.getLevel() + 1);
                 general.setMaxHp(general.getMaxHp() + 50);
-                general.setCurrentHp(general.getMaxHp()); // 升级状态自动回满
+                general.setCurrentHp(general.getMaxHp());
                 general.setCurrentExp(0);
                 log.add("【升级】叮！等级提升至 Lv." + general.getLevel() + "，血量上限提升并回满！");
             }
-
-            // 触发装备掉落
             log.add(lootService.dropEquipment(userId, stage));
-
         } else {
             log.add("--- 战役失败：溃退回城 ---");
-            // 仅存 20% 残兵
             army.recoverTroops(0.2);
             if ("KILLED".equals(general.getStatus())) {
-                army.clearTroops(); // 主将阵亡且战败，残部全数消失
+                army.clearTroops();
             }
         }
-
-        // 同步最新的带兵数量回武将实体
         general.setCurrentArmyCount(army.getTotalUnitCount());
-
-        // 持久化保存
         userProfileRepository.save(user);
         generalRepository.save(general);
     }
