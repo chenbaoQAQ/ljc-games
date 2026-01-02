@@ -110,6 +110,7 @@ public class BattleService {
             log.add("！！！【惨剧】主将战死沙场！军队大溃散，损失 50% 兵力！");
         }
     }
+
     //战后结算方法
     private void processPostBattle(Integer userId, UserGeneral general, Army army,
                                    StageConfig stage, boolean isVictory, List<String> log) {
@@ -118,21 +119,44 @@ public class BattleService {
 
         if (isVictory) {
             log.add("--- 战斗胜利 ---");
-            // 恢复 70% 伤兵
+
+            // 1. 兵力恢复：恢复 70% 伤兵
             army.recoverTroops(0.7);
-            // 发放金币与钻石
+
+            // 2. 财富发放：发放金币与钻石
             user.setGold(user.getGold() + stage.getGoldReward());
-            // 触发掉落逻辑
+            if (stage.getDiamondReward() != null) {
+                user.setDiamond(user.getDiamond() + stage.getDiamondReward());
+            }
+
+            // 3. 武将成长：增加武将经验 (每场胜利得 50 点)
+            int expGain = 50;
+            general.setCurrentExp(general.getCurrentExp() + expGain);
+            log.add(String.format("【成长】%s 获得了 %d 点经验！", general.getName(), expGain));
+
+            // 4. 升级判定：100 经验升一级
+            if (general.getCurrentExp() >= 100) {
+                general.setLevel(general.getLevel() + 1);
+                general.setMaxHp(general.getMaxHp() + 50); // 升级提升生存上限
+                general.setCurrentHp(general.getMaxHp());   // 升级瞬间状态回满
+                general.setCurrentExp(0);                  // 经验重置
+                log.add(String.format("【升级】叮！%s 等级提升至 %d，最大血量增加 50！", general.getName(), general.getLevel()));
+            }
+
+            // 5. 掉落判定：触发掉落逻辑
             log.add(lootService.dropEquipment(userId, stage));
+
         } else {
             log.add("--- 战斗失败 ---");
             // 仅存 20% 溃军
             army.recoverTroops(0.2);
             // 失败惩罚：如果是主将阵亡，兵力清零
-            if ("KILLED".equals(general.getStatus())) army.clearTroops();
+            if ("KILLED".equals(general.getStatus())) {
+                army.clearTroops();
+            }
         }
 
-        // 保存所有状态
+        // 最后统一保存所有状态，确保数据入库
         userProfileRepository.save(user);
         generalRepository.save(general);
     }

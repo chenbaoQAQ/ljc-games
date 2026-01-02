@@ -33,6 +33,31 @@ public class CombatEngine {
         return totalBaseAtk * personalityMod * statusMod;
     }
 
+    public double calculateGeneralOnlyAtk(UserGeneral general, List<Equipment> equips) {
+        // 1. 获取装备带来的攻击加成
+        int equipAtkBonus = 0;
+        if (equips != null) {
+            equipAtkBonus = equips.stream().mapToInt(Equipment::getAtkBonus).sum();
+        }
+
+        // 2. 基础攻击力（武将本身攻击力 + 装备攻击力）
+        // 注意：这里我们假设 UserGeneral 还没有 baseAtk 属性，如果以后加了可以再加上
+        double totalAtk = 50.0 + equipAtkBonus; // 50 是给武将设定的一个基础初始战力
+
+        // 3. 性格修正系数
+        double personalityMod = getPersonalityModifier(general.getPersonality());
+
+        // 4. 状态惩罚系数（比如已经负伤了，PK伤害也会降低）
+        double statusMod = 1.0;
+        if ("WOUNDED".equals(general.getStatus())) {
+            statusMod = 0.9;
+        } else if ("KILLED".equals(general.getStatus())) {
+            statusMod = 0.0;
+        }
+
+        return totalAtk * personalityMod * statusMod;
+    }
+
     private double getPersonalityModifier(String personality) {
         if (personality == null) return 1.0;
         switch (personality) {

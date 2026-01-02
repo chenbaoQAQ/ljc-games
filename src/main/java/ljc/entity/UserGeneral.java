@@ -21,6 +21,9 @@ public class UserGeneral {
     private int currentHp = 1000;  // 当前血量
     private int currentArmyCount;  // 当前兵力人数
     private String status = "HEALTHY"; // 状态：HEALTHY, WOUNDED, KILLED
+    // UserGeneral.java
+    private int level = 1;        // 武将等级，默认1级
+    private int currentExp = 0;   // 当前经验值
 
     // 2. Getter 和 Setter 方法（这是 IDEA 识别 getCurrentHp 等指令的关键）
 
@@ -38,5 +41,9 @@ public class UserGeneral {
     // 获取和设置状态
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public int getLevel() { return level; }
+    public void setLevel(int level) { this.level = level; }
+    public int getCurrentExp() { return currentExp; }
+    public void setCurrentExp(int currentExp) { this.currentExp = currentExp; }
 
 }

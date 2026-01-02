@@ -30,4 +30,9 @@ public class Equipment {
     public enum EquipType {
         WEAPON, ARMOR, TALLY
     }
+    // Equipment.java 里的逻辑
+    public void upgrade() {
+        this.level += 1; // 强化等级 +1
+        this.atkBonus += 20; // 每次强化固定增加 20 点攻击力
+    }
 }
