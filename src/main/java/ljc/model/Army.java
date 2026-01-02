@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Data
+//它是一个逻辑模型，专门负责管理小兵的分配与战损。比如 100 个人受了伤，它负责计算步兵和弓兵分别死多少个。
 public class Army {
     private UserGeneral leader;
     // 初始化 troopMap 防止空指针
@@ -53,7 +54,7 @@ public class Army {
     }
 
     /**
-     * 2. 兵力清零逻辑 (补全该方法，消灭 BattleService 红字)
+     * 2. 兵力清零逻辑
      */
     public void clearTroops() {
         if (troopMap != null) {

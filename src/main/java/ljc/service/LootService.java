@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.Random;
 
 @Service
+//战后摸奖。它会根据关卡的爆率，决定玩家能不能拿到新装备。
 public class LootService {
 
     @Autowired

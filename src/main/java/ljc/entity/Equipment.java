@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 @Data
 @Entity
 @Table(name = "equipment")
+//记录每一件武器的加成数值（攻击力、强化等级等）。
 public class Equipment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

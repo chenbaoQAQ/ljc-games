@@ -9,6 +9,7 @@ import java.util.List;
 public class CombatEngine {
 
 
+    //它是一个纯粹的数学专家。专门负责计算最终伤害数字。它会把武将的性格、装备加成和小兵的战力全部拧在一起，算出每一回合到底该掉多少血。
     public double calculateFinalAtk(int armyBasePower, List<Equipment> equips, UserGeneral general) {
         // 1. 累加装备攻击加成
         int equipAtkBonus = 0;

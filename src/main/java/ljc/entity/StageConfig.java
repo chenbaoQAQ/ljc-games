@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 @Data
 @Entity
 @Table(name = "stage_config")
+//定义了敌人的强度、关卡的血量以及通关后能给多少金币
 public class StageConfig {
     @Id
     private Integer id;

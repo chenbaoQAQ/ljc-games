@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.*;
 import java.util.*;
 
+//它主要处理从战斗开始到战斗结算的完整流程。它决定了什么时候开始武将 PK、什么时候大军对砍，并在最后发放奖励。
 @Service
 public class BattleService {
     @Autowired

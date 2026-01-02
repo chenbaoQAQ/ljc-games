@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 @Data
 @Entity
 @Table(name = "user_general")
+//存储武将的实时状态，比如等级、当前血量，以及关键的受伤状态
 public class UserGeneral {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
