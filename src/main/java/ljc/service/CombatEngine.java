@@ -4,69 +4,72 @@ import ljc.entity.Equipment;
 import ljc.entity.UserGeneral;
 import org.springframework.stereotype.Component;
 import java.util.List;
+import java.util.Random;
 
 @Component
+/**
+ * 补全后的数值引擎：
+ * 1. 支持武器（ATK）、防具（HP）、兵符（LEADERSHIP）全装备加成。
+ * 2. 区分单挑（PK）与大军混战的计算逻辑。
+ * 3. 引入性格对概率事件的微调。
+ */
 public class CombatEngine {
 
+    private final Random random = new Random();
 
-    //它是一个纯粹的数学专家。专门负责计算最终伤害数字。它会把武将的性格、装备加成和小兵的战力全部拧在一起，算出每一回合到底该掉多少血。
+    // 计算全军混合伤害
     public double calculateFinalAtk(int armyBasePower, List<Equipment> equips, UserGeneral general) {
-        // 1. 累加装备攻击加成
-        int equipAtkBonus = 0;
-        if (equips != null) {
-            equipAtkBonus = equips.stream().mapToInt(Equipment::getAtkBonus).sum();
-            //mapToInt(Equipment::getAtkBonus).sum()从Equipment里面取AtkBonus累加
-        }
+        // 1. 汇总装备攻击加成
+        int equipAtkBonus = equips.stream()
+                .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
+                .mapToInt(Equipment::getAtkBonus).sum();
 
         double totalBaseAtk = armyBasePower + equipAtkBonus;
 
-        // 2. 获取性格修正系数
-        double personalityMod = getPersonalityModifier(general.getPersonality());
+        // 2. 系数叠加：性格系数 * 状态惩罚
+        double mods = getPersonalityModifier(general.getPersonality()) * getStatusModifier(general.getStatus());
 
-        // 3. 获取状态惩罚系数
-        double statusMod = 1.0;
-        if ("WOUNDED".equals(general.getStatus())) {
-            statusMod = 0.9; // 受伤战力发挥 80%
-        } else if ("KILLED".equals(general.getStatus())) {
-            statusMod = 0.0; // 阵亡全军溃散
-        }
-
-        return totalBaseAtk * personalityMod * statusMod;
+        return totalBaseAtk * mods;
     }
 
-    public double calculateGeneralOnlyAtk(UserGeneral general, List<Equipment> equips) {
-        // 1. 获取装备带来的攻击加成
-        int equipAtkBonus = 0;
-        if (equips != null) {
-            equipAtkBonus = equips.stream().mapToInt(Equipment::getAtkBonus).sum();
+    // 计算武将单挑伤害（PK阶段）
+    public double calculatePKDamage(UserGeneral general, List<Equipment> equips, List<String> log) {
+        int weaponAtk = equips.stream()
+                .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
+                .mapToInt(Equipment::getAtkBonus).sum();
+
+        double atkBase = general.getBaseAtk() + weaponAtk;
+        double damage = atkBase * getPersonalityModifier(general.getPersonality()) * getStatusModifier(general.getStatus());
+
+        // 技能触发：暴躁性格额外增加 5% 触发率
+        double triggerChance = general.getSkillTriggerChance();
+        if ("RASH".equals(general.getPersonality())) triggerChance += 0.05;
+
+        if (random.nextDouble() < triggerChance) {
+            damage *= general.getSkillDamageRatio();
+            log.add(String.format("★★★【技能】%s 爆发大招 [%s]！造成了 %.0f 伤害！",
+                    general.getName(), general.getActiveSkillName(), damage));
         }
 
-        // 2. 基础攻击力（武将本身攻击力 + 装备攻击力）
-        // 注意：这里我们假设 UserGeneral 还没有 baseAtk 属性，如果以后加了可以再加上
-        double totalAtk = 50.0 + equipAtkBonus; // 50 是给武将设定的一个基础初始战力
-
-        // 3. 性格修正系数
-        double personalityMod = getPersonalityModifier(general.getPersonality());
-
-        // 4. 状态惩罚系数（比如已经负伤了，PK伤害也会降低）
-        double statusMod = 1.0;
-        if ("WOUNDED".equals(general.getStatus())) {
-            statusMod = 0.9;
-        } else if ("KILLED".equals(general.getStatus())) {
-            statusMod = 0.0;
-        }
-
-        return totalAtk * personalityMod * statusMod;
+        return damage;
     }
 
+    // 状态修正
+    private double getStatusModifier(String status) {
+        if ("WOUNDED".equals(status)) return 0.85; // 受伤下降 15% 战力
+        if ("KILLED".equals(status)) return 0.0;
+        return 1.0;
+    }
+
+    // 性格修正
     private double getPersonalityModifier(String personality) {
         if (personality == null) return 1.0;
-        switch (personality) {
-            case "BRAVE": return 1.1;  // 勇敢：+10% 攻击
-            case "RASH":  return 1.2;  // 暴躁：+20% 攻击
-            case "CALM":  return 1.05; // 冷静：+5% 攻击
-            case "CAUTIOUS": return 1.0; // 谨慎：基础攻击，但生存高（后续可加防御逻辑）
-            default: return 1.0;
-        }
+        return switch (personality) {
+            case "BRAVE" -> 1.15; // 勇敢：纯伤害高
+            case "RASH" -> 1.25;  // 暴躁：伤害最高但容易受伤（由Service处理概率）
+            case "CALM" -> 1.05;  // 冷静：稳健发挥
+            case "CAUTIOUS" -> 1.0; // 谨慎：无伤害加成但有防御潜力
+            default -> 1.0;
+        };
     }
 }
