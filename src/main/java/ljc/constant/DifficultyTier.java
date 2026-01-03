@@ -1,21 +1,22 @@
-package ljc.constant;
+package ljc.model;
 
 import lombok.Getter;
 
 @Getter
 public enum DifficultyTier {
-    // 1.0 档：普通 (NORMAL)
-    NORMAL(1.0, "普通"),
-    // 1.2 档：困难 (HARD)
-    HARD(1.2, "困难"),
-    // 1.5 档：噩梦 (NIGHTMARE)
-    NIGHTMARE(1.5, "噩梦");
+    NORMAL("普通", 1.0, 1.0, 1.0),
+    HARD("困难", 1.5, 1.3, 1.2),
+    NIGHTMARE("噩梦", 2.5, 1.8, 1.5);
 
-    private final double factor; // 倍率因子
-    private final String displayName; // 中文显示名
+    private final String name;
+    private final double hpMultiplier;    // 敌人血量加成
+    private final double atkMultiplier;   // 敌人攻击加成
+    private final double rewardMultiplier; // 金币额外收益
 
-    DifficultyTier(double factor, String displayName) {
-        this.factor = factor;
-        this.displayName = displayName;
+    DifficultyTier(String name, double hpMultiplier, double atkMultiplier, double rewardMultiplier) {
+        this.name = name;
+        this.hpMultiplier = hpMultiplier;
+        this.atkMultiplier = atkMultiplier;
+        this.rewardMultiplier = rewardMultiplier;
     }
 }

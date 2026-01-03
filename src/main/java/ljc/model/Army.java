@@ -28,7 +28,8 @@ public class Army {
         }
         return buffs;
     }
-    //特种兵提供英雄buff
+
+    // 特种兵提供英雄buff (英国特种兵：王室亲卫)
     public int calculateHeroBuffCount() {
         for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
             if ("EN_SPECIAL".equals(entry.getKey().getUnitName())) {
