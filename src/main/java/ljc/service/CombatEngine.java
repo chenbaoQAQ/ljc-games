@@ -6,37 +6,23 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-/**
- * 战斗引擎：处理动态数值逻辑
- */
 public class CombatEngine {
 
-    /**
-     * 计算武将 PK 阶段的最终伤害
-     * @param general 武将实例
-     * @param equips 装备列表
-     * @param heroBuffCount 英雄流加持次数
-     */
     public double calculatePKDamage(UserGeneral general, List<Equipment> equips, int heroBuffCount) {
-        // 1. 汇总装备攻击力
         int weaponAtk = (equips == null) ? 0 : equips.stream()
                 .filter(e -> e.getEquipType() == Equipment.EquipType.WEAPON)
                 .mapToInt(Equipment::getAtkBonus).sum();
 
-        // 2. 获取武将基础攻击力
         double atkBase = general.getBaseAtk() + weaponAtk;
-
-        // 3. 计算性格加成与状态惩罚
         double personalityMod = getPersonalityModifier(general.getPersonality());
         double statusMod = getStatusModifier(general.getStatus());
+
         double finalDamage = atkBase * personalityMod * statusMod;
 
-        // 4. 英国特种兵“英雄流”加成逻辑
+        // 英雄流加成：每加持 1 次增加 10 点固定伤害
         if (heroBuffCount > 0) {
-            double extraDamage = heroBuffCount * 10.0 * personalityMod;
-            finalDamage += extraDamage;
+            finalDamage += (heroBuffCount * 10.0 * personalityMod);
         }
-
         return finalDamage;
     }
 

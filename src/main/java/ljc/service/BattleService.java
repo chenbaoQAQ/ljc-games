@@ -2,7 +2,6 @@ package ljc.service;
 
 import ljc.entity.*;
 import ljc.model.*;
-import ljc.model.DifficultyTier;
 import ljc.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -10,190 +9,116 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 @Service
-/**
- * 核心战斗指挥中心：
- * 1. 区分 [闯关模式] (需传入 DifficultyTier) 与 [无尽模式] (tier 为 null)。
- * 2. 闯关模式下，不同难度的首通奖独立领取。
- * 3. 整合了英国特种兵（英雄流）的单挑加持逻辑。
- */
 public class BattleService {
+    @Autowired private UserGeneralRepository generalRepository;
+    @Autowired private UserProfileRepository userProfileRepository;
+    @Autowired private UserStageProgressRepository progressRepository;
     @Autowired private EquipmentRepository equipmentRepository;
+    @Autowired private UnitConfigRepository unitRepo;
     @Autowired private CombatEngine combatEngine;
     @Autowired private LootService lootService;
-    @Autowired private UserProfileRepository userProfileRepository;
-    @Autowired private UserGeneralRepository generalRepository;
-    @Autowired private UserStageProgressRepository progressRepository;
 
     @Transactional
-    public List<String> conductBattle(Integer userId, Integer generalId, StageConfig stage, Army army, DifficultyTier tier) {
+    public List<String> conductBattle(Integer userId, Integer generalId, StageConfig stage, DifficultyTier tier) {
         List<String> battleLog = new ArrayList<>();
+        UserGeneral general = generalRepository.findById(generalId).orElseThrow();
 
-        // 1. 数据准备
-        UserGeneral general = generalRepository.findById(generalId)
-                .orElseThrow(() -> new RuntimeException("找不到武将 ID: " + generalId));
-        List<Equipment> equips = equipmentRepository.findByOwnerGeneralId(generalId);
+        // 1. 初始化部队 (JSON 还原)
+        Army army = new Army();
+        army.fromJson(general.getArmyConfigStr(), unitRepo);
 
-        // 2. 模式切换与数值动态计算
-        int enemyHp;
-        double enemyAtkFactor;
-
-        if (tier != null) {
-            // 【闯关模式】：数值受难度系数影响
-            enemyHp = (int)(stage.getEnemyBaseHp() * tier.getHpMultiplier());
-            enemyAtkFactor = stage.getEnemyAtkBuff().doubleValue() * tier.getAtkMultiplier();
-            battleLog.add(String.format("【挑战】%s | 难度等级：%s", stage.getStageName(), tier.getName()));
-        } else {
-            // 【无尽模式】：使用基础/计算好的层数数值
-            enemyHp = stage.getEnemyBaseHp();
-            enemyAtkFactor = stage.getEnemyAtkBuff().doubleValue();
-            battleLog.add("【挑战】正在进行无尽模式挑战...");
+        if (army.getTotalUnitCount() <= 0) {
+            battleLog.add("【警告】主将麾下无兵，无法出征！");
+            return battleLog;
         }
 
+        // 2. 数值与难度判定
+        int enemyHp = (tier != null) ? (int)(stage.getEnemyBaseHp() * tier.getHpMultiplier()) : stage.getEnemyBaseHp();
+        double enemyAtkFactor = (tier != null) ? (stage.getEnemyAtkBuff().doubleValue() * tier.getAtkMultiplier()) : stage.getEnemyAtkBuff().doubleValue();
         String enemyType = stage.getMainEnemyType() != null ? stage.getMainEnemyType() : "INFANTRY";
         int round = 1;
 
-        battleLog.add(String.format("【开战】主将 [%s] (Lv.%d) 领兵出战！(敌军主力: %s)",
-                general.getName(), general.getLevel(), enemyType));
+        battleLog.add(String.format("【开战】主将 [%s] 领兵决战 %s (主力: %s)！", general.getName(), stage.getStageName(), enemyType));
 
-        // ==========================================
-        // 阶段一：武将对决 (PK阶段)
-        // ==========================================
+        // 阶段一：武将单挑 (英雄流判定)
+        List<Equipment> equips = equipmentRepository.findByOwnerGeneralId(generalId);
         while (round <= 3 && general.getCurrentHp() > 0 && enemyHp > 0) {
             battleLog.add("--- 第 " + round + " 回合：武将单挑 ---");
-
-            // 计算英雄流加持次数
             int heroBuffs = army.calculateHeroBuffCount();
-            if (heroBuffs > 0) {
-                battleLog.add(String.format(">> [王室亲卫] 提供 %d 次力量加持，武将单挑伤害大幅提升！", heroBuffs));
-            }
+            if (heroBuffs > 0) battleLog.add(String.format(">> [英雄流] 亲卫加持，攻击提升 %d 次！", heroBuffs));
 
-            // 计算武将伤害
-            double damage = combatEngine.calculatePKDamage(general, equips, heroBuffs);
-            enemyHp -= (int)damage;
-
-            // 敌方反击
-            int counterAtk = (int)(100 * enemyAtkFactor);
-            general.setCurrentHp(general.getCurrentHp() - counterAtk);
-
-            battleLog.add(String.format("[%s] 施展武艺造成 %d 伤害，自身余血: %d",
-                    general.getName(), (int)damage, Math.max(0, general.getCurrentHp())));
-
+            double dmg = combatEngine.calculatePKDamage(general, equips, heroBuffs);
+            enemyHp -= (int)dmg;
+            general.setCurrentHp(general.getCurrentHp() - (int)(100 * enemyAtkFactor));
+            battleLog.add(String.format("[%s] 造成 %d 伤害，自身余血: %d", general.getName(), (int)dmg, Math.max(0, general.getCurrentHp())));
             checkGeneralStatus(general, army, battleLog);
             if ("KILLED".equals(general.getStatus())) break;
             round++;
         }
 
-        // ==========================================
-        // 阶段二：混战阶段
-        // ==========================================
-        if (!"KILLED".equals(general.getStatus()) && enemyHp > 0 && army.getTotalUnitCount() > 0) {
-            battleLog.add("=== 进入混战阶段：三军对垒 ===");
-
+        // 阶段二：全军混战 (战术集火版)
+        if (enemyHp > 0 && !"KILLED".equals(general.getStatus())) {
+            battleLog.add("=== 进入混战阶段 ===");
             while (army.getTotalUnitCount() > 0 && enemyHp > 0) {
-                battleLog.add("--- 第 " + round + " 回合全军出击 ---");
-
                 Map<String, Integer> buffs = army.calculateSpecialBuffs();
 
-                // 弓兵
-                if (combatEngine.getAttackPriority("ARCHER", enemyType) >= 100) {
-                    battleLog.add(">> [战术] 弓兵方阵锁定敌方克制目标，开始优先集火...");
-                }
+                // 弓兵波次
+                if (combatEngine.getAttackPriority("ARCHER", enemyType) >= 100) battleLog.add(">> [战术] 弓兵方阵锁定克制目标进行优先集火...");
                 int archerDmg = army.getUnitAttackPower("ARCHER", enemyType, buffs.getOrDefault("ARCHER", 0), combatEngine);
                 enemyHp -= archerDmg;
-                if(archerDmg > 0) battleLog.add(String.format(">> 弓兵造成 %d 伤害 %s",
-                        archerDmg, combatEngine.isCounter("ARCHER", enemyType) ? "【克制★】" : ""));
+                if(archerDmg > 0) battleLog.add(String.format(">> 弓兵造成 %d 伤害 %s", archerDmg, combatEngine.isCounter("ARCHER", enemyType) ? "【克制！】" : ""));
 
-                // 步兵
+                // 在混战阶段循环内补全
                 int infantryDmg = army.getUnitAttackPower("INFANTRY", enemyType, buffs.getOrDefault("INFANTRY", 0), combatEngine);
                 enemyHp -= infantryDmg;
-                if(infantryDmg > 0) battleLog.add(String.format(">> 步兵造成 %d 伤害 %s",
-                        infantryDmg, combatEngine.isCounter("INFANTRY", enemyType) ? "【克制★】" : ""));
+                if(infantryDmg > 0) battleLog.add(String.format(">> 步兵造成 %d 伤害 %s", infantryDmg, combatEngine.isCounter("INFANTRY", enemyType) ? "【克制！】" : ""));
 
-                // 骑兵
                 int cavalryDmg = army.getUnitAttackPower("CAVALRY", enemyType, buffs.getOrDefault("CAVALRY", 0), combatEngine);
                 enemyHp -= cavalryDmg;
-                if(cavalryDmg > 0) battleLog.add(String.format(">> 骑兵造成 %d 伤害 %s",
-                        cavalryDmg, combatEngine.isCounter("CAVALRY", enemyType) ? "【克制★】" : ""));
+                if(cavalryDmg > 0) battleLog.add(String.format(">> 骑兵造成 %d 伤害 %s", cavalryDmg, combatEngine.isCounter("CAVALRY", enemyType) ? "【克制！】" : ""));
 
-                // 特种兵自身输出
                 int specialDmg = army.getSpecialUnitPersonalAttack(combatEngine);
                 enemyHp -= specialDmg;
                 if(specialDmg > 0) battleLog.add(String.format(">> 特种兵袭杀造成 %d 额外伤害", specialDmg));
 
                 if (enemyHp <= 0) break;
-
-                // 敌方反击
-                int enemyReflex = (int)(150 * enemyAtkFactor);
-                army.receiveDamage(enemyReflex);
-
-                if (Math.random() < 0.15) {
-                    general.setCurrentHp(general.getCurrentHp() - 50);
-                    checkGeneralStatus(general, army, battleLog);
-                }
-
+                army.receiveDamage((int)(150 * enemyAtkFactor));
+                if (Math.random() < 0.15) { general.setCurrentHp(general.getCurrentHp() - 50); checkGeneralStatus(general, army, battleLog); }
                 round++;
                 if (round > 50) break;
             }
         }
 
-        boolean isVictory = enemyHp <= 0;
-        processFinalSettlement(userId, general, army, stage, tier, isVictory, battleLog);
-
+        // 3. 结算与 JSON 保存
+        processFinalSettlement(userId, general, army, stage, tier, enemyHp <= 0, battleLog);
+        general.setArmyConfigStr(army.toJson());
+        general.setCurrentArmyCount(army.getTotalUnitCount());
+        generalRepository.save(general);
         return battleLog;
     }
 
-    private void processFinalSettlement(Integer userId, UserGeneral general, Army army,
-                                        StageConfig stage, DifficultyTier tier, boolean isVictory, List<String> log) {
+    private void processFinalSettlement(Integer userId, UserGeneral general, Army army, StageConfig stage, DifficultyTier tier, boolean isVictory, List<String> log) {
         UserProfile user = userProfileRepository.findById(userId).get();
-
         if (isVictory) {
-            log.add("--- 战斗胜利：凯旋归来 ---");
+            log.add("--- 战斗胜利 ---");
             army.recoverTroops(0.7);
-
             if (tier != null) {
-                String diffName = tier.name();
-                Optional<UserStageProgress> progressOpt = progressRepository.findByUserIdAndStageIdAndDifficulty(userId, stage.getId(), diffName);
-
-                if (progressOpt.isEmpty() || !progressOpt.get().isFirstCleared()) {
+                Optional<UserStageProgress> prog = progressRepository.findByUserIdAndStageIdAndDifficulty(userId, stage.getId(), tier.name());
+                if (prog.isEmpty() || !prog.get().isFirstCleared()) {
                     user.setGold(user.getGold() + stage.getGoldReward());
                     user.setDiamond(user.getDiamond() + stage.getDiamondReward());
-                    log.add(String.format("【首通大奖】达成 [%s] 难度！获得金币：%d，钻石：%d！",
-                            tier.getName(), stage.getGoldReward(), stage.getDiamondReward()));
-
-                    UserStageProgress p = progressOpt.orElse(new UserStageProgress());
-                    p.setUserId(userId); p.setStageId(stage.getId()); p.setDifficulty(diffName); p.setFirstCleared(true);
+                    UserStageProgress p = prog.orElse(new UserStageProgress());
+                    p.setUserId(userId); p.setStageId(stage.getId()); p.setDifficulty(tier.name()); p.setFirstCleared(true);
                     progressRepository.save(p);
-                } else {
-                    user.setGold(user.getGold() + 50);
-                    log.add("【日常】已领过该难度首通，获得常规战利品金币 +50");
+                    log.add(">> [首通奖] 成功领取该难度钻石金币奖励！");
                 }
-            } else {
-                user.setGold(user.getGold() + 100);
-                log.add("【爬塔收益】获得无尽模式金币奖励 +100");
             }
-
             general.setCurrentExp(general.getCurrentExp() + 50);
-            if (general.getCurrentExp() >= 100) {
-                general.setLevel(general.getLevel() + 1);
-                general.setMaxHp(general.getMaxHp() + 50);
-                general.setCurrentHp(general.getMaxHp());
-                general.setCurrentExp(0);
-                log.add(">> [武将升级] 赵云战力提升，当前等级 Lv." + general.getLevel());
-            }
-
-            log.add(lootService.dropEquipment(userId, stage));
-
         } else {
-            log.add("--- 战斗失败：残部撤退 ---");
+            log.add("--- 战败 ---");
             army.recoverTroops(0.2);
-            if ("KILLED".equals(general.getStatus())) {
-                army.clearTroops();
-            }
         }
-
-        general.setCurrentArmyCount(army.getTotalUnitCount());
         userProfileRepository.save(user);
-        generalRepository.save(general);
     }
 
     private void checkGeneralStatus(UserGeneral general, Army army, List<String> log) {
@@ -201,13 +126,12 @@ public class BattleService {
         if (hpPercent <= 0.8 && "HEALTHY".equals(general.getStatus())) {
             general.setStatus("WOUNDED");
             army.receiveDamage((int) (army.getTotalUnitCount() * 0.1));
-            log.add("！！！主将负伤！士兵恐慌损失 10%！");
+            log.add("！！！主将负伤，士兵逃亡 10%！");
         }
         if (general.getCurrentHp() <= 0 && !"KILLED".equals(general.getStatus())) {
             general.setStatus("KILLED");
-            general.setCurrentHp(0);
             army.receiveDamage((int) (army.getTotalUnitCount() * 0.5));
-            log.add("！！！主将阵亡！部队瞬间溃散 50%！");
+            log.add("！！！主将阵亡，军心崩溃损失 50%！");
         }
     }
 }

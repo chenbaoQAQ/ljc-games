@@ -15,5 +15,5 @@ public class UserStageProgress {
     private Integer stageId;
     private String difficulty; // NORMAL, HARD, NIGHTMARE
 
-    private boolean firstCleared = false; // 是否已领取该难度首通
+    private boolean firstCleared = false;
 }

@@ -1,22 +1,58 @@
 package ljc.model;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ljc.entity.UnitConfig;
+import ljc.repository.UnitConfigRepository;
 import ljc.service.CombatEngine;
 import lombok.Data;
 import java.util.*;
 
 @Data
-/**
- * 部队模型，处理静态的条件
- */
 public class Army {
     private Map<UnitConfig, Integer> troopMap = new HashMap<>();
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    public void fromJson(String json, UnitConfigRepository unitRepo) {
+        if (json == null || json.isEmpty() || "{}".equals(json)) return;
+        try {
+            Map<String, Integer> data = mapper.readValue(json, new TypeReference<Map<String, Integer>>() {});
+            troopMap.clear();
+            for (Map.Entry<String, Integer> entry : data.entrySet()) {
+                unitRepo.findByUnitName(entry.getKey()).ifPresent(unit -> {
+                    troopMap.put(unit, entry.getValue());
+                });
+            }
+        } catch (Exception e) {
+            System.err.println("部队配置解析失败: " + e.getMessage());
+        }
+    }
+
+    public String toJson() {
+        try {
+            Map<String, Integer> data = new HashMap<>();
+            for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
+                data.put(entry.getKey().getUnitName(), entry.getValue());
+            }
+            return mapper.writeValueAsString(data);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
 
     public int getTotalUnitCount() {
         return troopMap.values().stream().mapToInt(Integer::intValue).sum();
     }
 
-    // 计算特种兵提供的强化额度 (1个特种兵强化2个基础兵)
+    public int calculateHeroBuffCount() {
+        for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
+            if ("EN_SPECIAL".equals(entry.getKey().getUnitName())) {
+                return entry.getValue() / 5;
+            }
+        }
+        return 0;
+    }
+
     public Map<String, Integer> calculateSpecialBuffs() {
         Map<String, Integer> buffs = new HashMap<>();
         for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
@@ -29,17 +65,6 @@ public class Army {
         return buffs;
     }
 
-    // 特种兵提供英雄buff (英国特种兵：王室亲卫)
-    public int calculateHeroBuffCount() {
-        for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
-            if ("EN_SPECIAL".equals(entry.getKey().getUnitName())) {
-                return entry.getValue() / 5; // 每5个加持1次
-            }
-        }
-        return 0;
-    }
-
-    // 获取特定兵种波次的实时伤害
     public int getUnitAttackPower(String targetUnitName, String enemyType, int buffQuota, CombatEngine engine) {
         int power = 0;
         for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
@@ -47,23 +72,17 @@ public class Army {
             if (unit.getUnitName().equals(targetUnitName)) {
                 int count = entry.getValue();
                 int buffed = Math.min(count, buffQuota);
-                int normal = count - buffed;
                 power += (int)engine.calculateUnitDamage(unit.getBaseAtk(), targetUnitName, enemyType, true) * buffed;
-                power += (int)engine.calculateUnitDamage(unit.getBaseAtk(), targetUnitName, enemyType, false) * normal;
+                power += (int)engine.calculateUnitDamage(unit.getBaseAtk(), targetUnitName, enemyType, false) * (count - buffed);
             }
         }
         return power;
     }
 
-    // 特种兵自身伤害
     public int getSpecialUnitPersonalAttack(CombatEngine engine) {
-        int power = 0;
-        for (Map.Entry<UnitConfig, Integer> entry : troopMap.entrySet()) {
-            if (entry.getKey().getUnitName().endsWith("_SPECIAL")) {
-                power += entry.getValue() * entry.getKey().getBaseAtk();
-            }
-        }
-        return power;
+        return troopMap.entrySet().stream()
+                .filter(e -> e.getKey().getUnitName().endsWith("_SPECIAL"))
+                .mapToInt(e -> e.getValue() * e.getKey().getBaseAtk()).sum();
     }
 
     public void receiveDamage(int damage) {

@@ -3,6 +3,7 @@ package ljc.controller;
 import ljc.entity.StageConfig;
 import ljc.entity.UnitConfig;
 import ljc.model.Army;
+import ljc.model.DifficultyTier;
 import ljc.repository.StageConfigRepository;
 import ljc.service.BattleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,32 +26,22 @@ public class BattleController {
     public List<String> startBattle(
             @RequestParam Integer userId,
             @RequestParam Integer generalId,
-            @RequestParam Integer stageId) {
+            @RequestParam Integer stageId,
+            @RequestParam(required = false) String difficulty) { // 新增难度参数
 
         try {
-            // 1. 获取关卡
             StageConfig stage = stageRepository.findById(stageId)
                     .orElseThrow(() -> new RuntimeException("找不到关卡ID: " + stageId));
 
-            // 2. 紧急组建一支演习部队
-            Army testArmy = new Army();
+            // 将字符串难度转换为枚举对象，如果是无尽关卡则传入 null
+            DifficultyTier tier = (difficulty != null) ? DifficultyTier.valueOf(difficulty) : null;
 
-            // 模拟一个基础步兵配置
-            UnitConfig infantry = new UnitConfig();
-            infantry.setUnitName("INFANTRY"); // 必须匹配 Army.java 里的逻辑
-            infantry.setBaseAtk(15);
-
-            // 往部队里塞 100 名步兵
-            testArmy.getTroopMap().put(infantry, 100);
-
-            // 3. 开始战斗并返回日志
-            return battleService.conductBattle(userId, generalId, stage, testArmy);
+            // 调用修正后的 conductBattle，注意现在不需要在 Controller 手动创建 Army 对象了
+            return battleService.conductBattle(userId, generalId, stage, tier);
 
         } catch (Exception e) {
-            // 如果报错了，把错误信息打印在页面上，方便排查
             List<String> errorLog = new ArrayList<>();
             errorLog.add("【系统报错】: " + e.getMessage());
-            e.printStackTrace(); // 在 IDEA 控制台打印堆栈信息
             return errorLog;
         }
     }
