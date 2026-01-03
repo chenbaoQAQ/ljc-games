@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 @Data
 @Entity//告诉spring这是实体表
 @Table(name = "unit_config")
+//兵种配置
 public class UnitConfig {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

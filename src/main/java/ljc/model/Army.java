@@ -7,7 +7,7 @@ import java.util.*;
 
 @Data
 /**
- * 部队模型：补全了分波次火力输出的方法，消灭 BattleService 里的红字。
+ * 部队模型，处理静态的条件
  */
 public class Army {
     private Map<UnitConfig, Integer> troopMap = new HashMap<>();

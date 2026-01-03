@@ -8,7 +8,7 @@ import java.util.List;
 @Component
 /**
  * 战斗引擎：确保与 BattleService 的调用逻辑完全对齐。
- * 修复建议：如果 general.getBaseAtk() 报错，请务必在 UserGeneral 类中添加 baseAtk 字段。
+ * 用来处理动态数值
  */
 public class CombatEngine {
 

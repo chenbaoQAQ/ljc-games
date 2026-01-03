@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 @Data
 @Entity
 @Table(name = "user_profile")
+//存档
 public class UserProfile {
     @Id
     private Integer userId;
