@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -102,5 +103,14 @@ public class GameController {
         profileRepo.save(profile);
 
         return "已成功加入文明：" + country;
+    }
+
+    @PostMapping("/assign-troops")
+    public String assign(@RequestParam Integer generalId, @RequestBody Map<String, Integer> config) {
+        try {
+            return barracksService.assignTroops(generalId, config);
+        } catch (Exception e) {
+            return "分配报错: " + e.getMessage();
+        }
     }
 }

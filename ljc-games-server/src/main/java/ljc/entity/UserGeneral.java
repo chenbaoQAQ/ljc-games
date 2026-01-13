@@ -22,7 +22,7 @@ public class UserGeneral {
     private int baseHp = 1000;
 
     // 增加最大统帅值字段，用于记录该武将当前的带兵上限
-    private int maxLeadership;
+    private int maxLeadership = 100;
 
     // 实时状态
     private int maxHp = 1000;
@@ -32,9 +32,11 @@ public class UserGeneral {
     private int level = 1;
     private int currentExp = 0;
 
-    // 💡 核心：JSON 存储，如 {"INFANTRY":100, "EN_SPECIAL":10}
+
+    // 阵前兵力：战斗时实际带走的
     @Column(columnDefinition = "TEXT")
     private String armyConfigStr = "{}";
 
-
+    @Column(columnDefinition = "TEXT")
+    private String reserveArmyConfigStr = "{}";
 }

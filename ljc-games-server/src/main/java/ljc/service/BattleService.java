@@ -243,4 +243,19 @@ public class BattleService {
             log.add(String.format("！！！【悲剧】主将 [%s] 壮烈牺牲，全军崩溃，损失 50%% 兵力！", general.getName()));
         }
     }
+
+    private void returnSurvivorsToReserve(UserGeneral general, Army activeArmy) {
+        Army reserve = new Army();
+        reserve.fromJson(general.getReserveArmyConfigStr(), unitRepo);
+
+        // 将幸存者加回仓库
+        activeArmy.getTroopMap().forEach((unit, count) -> {
+            int current = reserve.getTroopMap().getOrDefault(unit, 0);
+            reserve.getTroopMap().put(unit, current + count);
+        });
+
+        general.setReserveArmyConfigStr(reserve.toJson());
+        general.setArmyConfigStr("{}"); // 清空阵前，强制下场战斗重新分配
+        general.setCurrentArmyCount(0);
+    }
 }

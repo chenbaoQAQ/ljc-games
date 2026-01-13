@@ -99,4 +99,10 @@ public class Army {
     }
 
     public void clearTroops() { troopMap.clear(); }
+
+    public int calculateTotalSpace() {
+        return troopMap.entrySet().stream()
+                .mapToInt(e -> e.getKey().getSpaceCost() * e.getValue())
+                .sum();
+    }
 }
