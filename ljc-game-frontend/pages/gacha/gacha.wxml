@@ -1,0 +1,6 @@
+<view style="padding: 20px; text-align: center;">
+  <view style="border: 2rpx dashed #ccc; padding: 40rpx; margin-bottom: 40rpx; min-height: 200rpx; display: flex; align-items: center; justify-content: center;">
+    <text>{{result}}</text>
+  </view>
+  <button type="warn" bindtap="doGacha">消耗 100 钻石招募</button>
+</view>

@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/gacha/gacha",
+    "pages/battle/battle",
+    "pages/barracks/barracks"
+  ],
+  "window": {
+    "navigationBarTitleText": "LJC 三国群英传",
+    "navigationBarBackgroundColor": "#000000",
+    "navigationBarTextStyle": "white"
+  }
+}

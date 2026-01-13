@@ -1,0 +1,18 @@
+<view style="padding: 20px;">
+  <view wx:if="{{!showBattle}}">
+    <view style="font-weight: bold; margin-bottom: 20rpx;">请指派主将出征：</view>
+    <picker bindchange="bindGenChange" value="{{genIndex}}" range="{{generals}}" range-key="name">
+      <view style="padding: 30rpx; border: 2rpx solid #409EFF; text-align: center; border-radius: 10rpx;">
+        出征主将：{{generals[genIndex].name}}
+      </view>
+    </picker>
+    <button type="warn" style="margin-top: 40rpx;" bindtap="startBattle">擂鼓开战</button>
+  </view>
+
+  <scroll-view wx:else scroll-y="true" style="height: 80vh; background: #000; color: #0f0; padding: 20rpx; font-family: monospace;">
+    <view wx:for="{{logs}}" wx:key="index" style="margin-bottom: 10rpx;">
+      {{item}}
+    </view>
+    <button type="primary" style="margin-top: 20rpx;" bindtap="resetBattle">返回选将</button>
+  </scroll-view>
+</view>

@@ -1,0 +1,24 @@
+<view style="padding: 20px;">
+  <view style="background: #fdf6ec; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between;">
+    <text>💰 金币: {{gold}}</text>
+  </view>
+
+  <view class="section-title" style="font-weight: bold; margin-bottom: 10rpx;">1. 选择要整备的武将：</view>
+  <picker bindchange="bindGeneralChange" value="{{index}}" range="{{generals}}" range-key="name">
+    <view style="padding: 20rpx; background: #fff; border: 1rpx solid #ddd; border-radius: 10rpx; margin-bottom: 30rpx;">
+      当前选中：<text style="color: #409EFF; font-weight: bold;">{{generals[index].name || '请选择武将'}}</text>
+      <view style="font-size: 24rpx; color: #999;">当前总兵力: {{generals[index].currentArmyCount || 0}}</view>
+    </view>
+  </picker>
+
+  <view class="section-title" style="font-weight: bold; margin-bottom: 10rpx;">2. 招募士兵：</view>
+  <view wx:for="{{unitList}}" wx:key="name" style="display: flex; justify-content: space-between; align-items: center; padding: 20rpx; border-bottom: 1rpx solid #eee; background: #fff;">
+    <view>
+      <view style="font-weight: bold;">{{item.label}}</view>
+      <view style="font-size: 24rpx; color: #666;">单价: {{item.cost}} 金币/名</view>
+    </view>
+    <button type="primary" size="mini" bindtap="doRecruit" data-name="{{item.name}}" disabled="{{!selectedGeneralId}}">招募 50 名</button>
+  </view>
+
+  <button style="margin-top: 40rpx;" bindtap="goBack">返回主城</button>
+</view>
