@@ -22,7 +22,7 @@ public class GameController {
     private UserProfileRepository profileRepo;
     // 抽卡接口
     @PostMapping("/gacha")
-    public String draw(@RequestParam Integer userId) {
+    public String draw(@RequestParam Integer userId){
         try {
             UserGeneral g = gachaService.drawGeneral(userId, 100); // 消耗100钻
             return String.format("【招募成功】你获得了 %s 级武将 [%s]！性格为：%s",
