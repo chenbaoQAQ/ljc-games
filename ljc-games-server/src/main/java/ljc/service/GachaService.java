@@ -60,14 +60,20 @@ public class GachaService {
         newGeneral.setName(template.getName());
         newGeneral.setMaxHp(template.getBaseHp());
         newGeneral.setCurrentHp(template.getBaseHp());
+        newGeneral.setBaseAtk(template.getBaseAtk()); // 记得同步基础攻击力
+        newGeneral.setBaseHp(template.getBaseHp());   // 记得同步基础血量
+
         // 随机赋予一种性格
         newGeneral.setPersonality(personalities[random.nextInt(personalities.length)]);
         newGeneral.setStatus("HEALTHY");
         newGeneral.setLevel(1);
         newGeneral.setCurrentExp(0);
 
-        // 带兵数量
-        newGeneral.setMaxLeadership(template.getBaseLeadership());
+        // --- 核心逻辑：初始化兵力配置 ---
+        newGeneral.setArmyConfigStr("{}");           // 阵前（Active）初始化为空 JSON
+        newGeneral.setReserveArmyConfigStr("{}");    // 后备仓库（Reserve）初始化为空 JSON
+        newGeneral.setCurrentArmyCount(0);           // 初始上阵人数为 0
+        newGeneral.setMaxLeadership(template.getBaseLeadership()); // 设置动态统帅上限
 
         return generalRepo.save(newGeneral);
     }
