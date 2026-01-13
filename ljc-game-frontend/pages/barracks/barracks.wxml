@@ -1,24 +1,66 @@
-<view style="padding: 20px;">
-  <view style="background: #fdf6ec; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between;">
-    <text>💰 金币: {{gold}}</text>
+<view class="container">
+  <view class="header">
+    <text class="gold">当前金币: {{gold}}</text>
   </view>
 
-  <view class="section-title" style="font-weight: bold; margin-bottom: 10rpx;">1. 选择要整备的武将：</view>
-  <picker bindchange="bindGeneralChange" value="{{index}}" range="{{generals}}" range-key="name">
-    <view style="padding: 20rpx; background: #fff; border: 1rpx solid #ddd; border-radius: 10rpx; margin-bottom: 30rpx;">
-      当前选中：<text style="color: #409EFF; font-weight: bold;">{{generals[index].name || '请选择武将'}}</text>
-      <view style="font-size: 24rpx; color: #999;">当前总兵力: {{generals[index].currentArmyCount || 0}}</view>
-    </view>
-  </picker>
+  <view class="army-card">
+    <picker bindchange="bindGeneralChange" value="{{index}}" range="{{generals}}" range-key="name">
+      <view class="picker-box">
+        当前武将：<text class="picker-name">{{generals[index].name || '载入中...'}}</text>
+      </view>
+    </picker>
 
-  <view class="section-title" style="font-weight: bold; margin-bottom: 10rpx;">2. 招募士兵：</view>
-  <view wx:for="{{unitList}}" wx:key="name" style="display: flex; justify-content: space-between; align-items: center; padding: 20rpx; border-bottom: 1rpx solid #eee; background: #fff;">
-    <view>
-      <view style="font-weight: bold;">{{item.label}}</view>
-      <view style="font-size: 24rpx; color: #666;">单价: {{item.cost}} 金币/名</view>
+    <view class="army-info">
+      <view class="army-title">当前带兵概览</view>
+      <view class="army-grid">
+        <block wx:if="{{currentArmyList && currentArmyList.length > 0}}">
+          <view class="army-item" wx:for="{{currentArmyList}}" wx:key="type">
+            <text class="unit-label">{{item.label}}</text>
+            <text class="unit-value">{{item.count}}</text>
+          </view>
+        </block>
+        <view wx:else class="empty-text">该武将麾下暂无士兵</view>
+      </view>
     </view>
-    <button type="primary" size="mini" bindtap="doRecruit" data-name="{{item.name}}" disabled="{{!selectedGeneralId}}">招募 50 名</button>
   </view>
 
-  <button style="margin-top: 40rpx;" bindtap="goBack">返回主城</button>
+  <view class="list-container">
+    <view wx:for="{{unitList}}" wx:key="name" class="unit-card">
+      <view class="unit-main">
+        <view class="unit-desc">
+          <text class="u-name">{{item.label}}</text>
+          <text class="u-cost">单价: {{item.cost}}</text>
+        </view>
+        
+        <view class="stepper">
+          <view class="s-btn" bindtap="changeCount" data-index="{{index}}" data-type="sub">-</view>
+          <input class="s-input" type="number" value="{{item.buyCount}}" bindinput="inputCount" data-index="{{index}}" />
+          <view class="s-btn" bindtap="changeCount" data-index="{{index}}" data-type="add">+</view>
+        </view>
+      </view>
+
+      <button 
+        class="recruit-btn"
+        type="primary" 
+        bindtap="doRecruit" 
+        data-name="{{item.name}}" 
+        data-count="{{item.buyCount}}"
+        disabled="{{!selectedGeneralId || item.buyCount <= 0}}">
+        确认招募 (需 {{item.cost * item.buyCount}} 金币)
+      </button>
+    </view>
+  </view>
+  
+  <button class="footer-btn" bindtap="goBack">返回主城</button>
+</view>
+
+<view class="result-overlay" wx:if="{{showResult}}" bindtap="closeResult">
+  <view class="result-box" catchtap="stopBubble">
+    <view class="res-title">—— 招募成功 ——</view>
+    <view class="res-content">
+      <view class="res-name">{{lastRecruitName}}</view>
+      <view class="res-num">+ {{lastRecruitCount}}</view>
+    </view>
+    <view class="res-tip">点击空白处继续</view>
+  </view>
 </view>

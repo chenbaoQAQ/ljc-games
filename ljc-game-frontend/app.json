@@ -3,7 +3,8 @@
     "pages/index/index",
     "pages/gacha/gacha",
     "pages/battle/battle",
-    "pages/barracks/barracks"
+    "pages/barracks/barracks",
+    "pages/select-country/select"
   ],
   "window": {
     "navigationBarTitleText": "LJC 三国群英传",

@@ -10,7 +10,7 @@ Page({
 
   /**
    * 生命周期函数--监听页面显示
-   * 每次从其他页面返回主页时，都会触发这个函数，自动刷新金币和钻石
+   * 每次从其他页面返回主页时，都会触发刷新
    */
   onShow: function () {
     this.fetchProfile();
@@ -29,8 +29,18 @@ Page({
         userId: this.data.userId
       },
       success: (res) => {
-        // res.data 对应后端的 UserProfile 实体对象
         if (res.statusCode === 200 && res.data) {
+          // --- 核心拦截逻辑 ---
+          // 检查玩家是否已经选择了国家
+          if (!res.data.unlockedCountries || res.data.unlockedCountries === "") {
+            console.log("检测到玩家未选择国家，准备跳转...");
+            wx.reLaunch({
+              url: '/pages/select-country/select' 
+            });
+            return; // 拦截成功后直接返回，不再执行后续赋值
+          }
+
+          // 如果已经选过国家，则正常更新数据
           that.setData({
             gold: res.data.gold,
             diamond: res.data.diamond
@@ -55,17 +65,20 @@ Page({
       url: '/pages/gacha/gacha'
     });
   },
+
   /**
    * 跳转到点兵台（前往兵营）
    */
-  goToBarracks() {
-    wx.navigateTo({ url: '/pages/barracks/barracks' });
+  goToBarracks: function () {
+    wx.navigateTo({
+      url: '/pages/barracks/barracks'
+    });
   },
+
   /**
    * 跳转到战斗页面（开始闯关）
    */
   startBattle: function () {
-    // 跳转到我们新创建的战斗日志页面
     wx.navigateTo({
       url: '/pages/battle/battle'
     });
