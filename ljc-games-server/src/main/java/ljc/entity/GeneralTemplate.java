@@ -6,12 +6,12 @@ import jakarta.persistence.*;
 @Data
 @Entity
 @Table(name = "general_template")
-//武将模板
 public class GeneralTemplate {
     @Id
     private Integer id;
     private String name;
     private Integer baseAtk;
     private Integer baseHp;
+    private Integer baseLeadership;
     private String rarity;
 }

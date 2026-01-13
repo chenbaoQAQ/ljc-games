@@ -21,16 +21,20 @@ public class UserGeneral {
     private int baseAtk = 50;
     private int baseHp = 1000;
 
+    // 增加最大统帅值字段，用于记录该武将当前的带兵上限
+    private int maxLeadership;
+
     // 实时状态
     private int maxHp = 1000;
     private int currentHp = 1000;
     private int currentArmyCount;  // 逻辑总兵力
     private String status = "HEALTHY"; // HEALTHY, WOUNDED, KILLED
-
     private int level = 1;
     private int currentExp = 0;
 
     // 💡 核心：JSON 存储，如 {"INFANTRY":100, "EN_SPECIAL":10}
     @Column(columnDefinition = "TEXT")
     private String armyConfigStr = "{}";
+
+
 }

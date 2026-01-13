@@ -66,8 +66,8 @@ public class GachaService {
         newGeneral.setLevel(1);
         newGeneral.setCurrentExp(0);
 
-        // 初始带兵数根据模版的基础统帅设定（暂定）
-        newGeneral.setCurrentArmyCount(100);
+        // 带兵数量
+        newGeneral.setMaxLeadership(template.getBaseLeadership());
 
         return generalRepo.save(newGeneral);
     }

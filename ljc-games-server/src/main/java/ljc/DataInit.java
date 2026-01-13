@@ -40,11 +40,11 @@ public class DataInit implements CommandLineRunner {
         // GB(不列颠)：长弓勇士 - 极远距离压制 (英雄流辅助)
         initUnit("GB_SPECIAL", 2, 40, 350, "HERO", 1.2);
 
-        // --- 2. 武将模板初始化 (GeneralTemplate) ---
-        if (templateRepo.findById(101).isEmpty()) saveTemplate(101, "赵云", 65, 1600, "SSR");
-        if (templateRepo.findById(102).isEmpty()) saveTemplate(102, "吕布", 110, 2000, "UR");
-        if (templateRepo.findById(103).isEmpty()) saveTemplate(103, "关羽", 90, 1800, "SSR");
-        if (templateRepo.findById(104).isEmpty()) saveTemplate(104, "诸葛亮", 45, 1300, "SSR");
+        // 修改后的 DataInit.java 调用代码
+        if (templateRepo.findById(101).isEmpty()) saveTemplate(101, "赵云", 65, 1600, 120, "SSR");
+        if (templateRepo.findById(102).isEmpty()) saveTemplate(102, "吕布", 110, 2000, 150, "UR");
+        if (templateRepo.findById(103).isEmpty()) saveTemplate(103, "关羽", 90, 1800, 150, "SSR");
+        if (templateRepo.findById(104).isEmpty()) saveTemplate(104, "诸葛亮", 45, 1300, 100, "SSR");
 
         // --- 3. 玩家存档初始化 (UserProfile) ---
         if (profileRepo.findById(1).isEmpty()) {
@@ -97,12 +97,13 @@ public class DataInit implements CommandLineRunner {
         }
     }
 
-    private void saveTemplate(int id, String name, int atk, int hp, String rarity) {
+    private void saveTemplate(int id, String name, int atk, int hp, int leadership, String rarity) {
         GeneralTemplate t = new GeneralTemplate();
         t.setId(id);
         t.setName(name);
         t.setBaseAtk(atk);
         t.setBaseHp(hp);
+        t.setBaseLeadership(leadership); // 注入带兵上限数据
         t.setRarity(rarity);
         templateRepo.save(t);
     }
