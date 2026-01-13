@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @Component
 /**
  * 系统初始化：为项目注入全量测试数据
- * 包含：基础兵种、三国名将模板、初始玩家存档、多级战术关卡
+ * 包含：基础兵种、三国名将模板、初始玩家存档、多级战术关卡、文明特种兵
  */
 public class DataInit implements CommandLineRunner {
 
@@ -22,57 +22,46 @@ public class DataInit implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        System.out.println(">>> [系统初始化] 正在同步战术版本测试数据...");
+        System.out.println(">>> [系统初始化] 正在同步文明战术版本测试数据...");
 
         // --- 1. 兵种配置初始化 (UnitConfig) ---
         // 基础兵种：容量、攻击、血量
-        initUnit("INFANTRY", 1, 15, 100, "NONE", 1.0);
-        initUnit("ARCHER", 1, 20, 80, "NONE", 1.0);
-        initUnit("CAVALRY", 2, 40, 200, "NONE", 1.0);
+        initUnit("INFANTRY", 1, 15, 120, "NONE", 1.0);
+        initUnit("ARCHER", 1, 22, 90, "NONE", 1.0);
+        initUnit("CAVALRY", 2, 45, 250, "NONE", 1.0);
 
-        // 特种兵：CN强化步兵，JP强化弓兵，KR强化骑兵，EN强化武将(英雄流)
-        initUnit("CN_SPECIAL", 3, 30, 250, "INFANTRY", 2.0);
-        initUnit("JP_SPECIAL", 3, 35, 200, "ARCHER", 2.0);
-        initUnit("KR_SPECIAL", 3, 45, 300, "CAVALRY", 2.0);
-        initUnit("EN_SPECIAL", 3, 25, 400, "HERO", 0.2);
+        // 文明特种兵：大幅提升数值，体现文明选择的价值
+        // CN(大汉)：汉之羽林 - 极高生存与反击
+        initUnit("CN_SPECIAL", 2, 35, 450, "INFANTRY", 1.5);
+        // JP(东瀛)：大和武士 - 极高爆发输出
+        initUnit("JP_SPECIAL", 2, 55, 180, "ARCHER", 1.5);
+        // KR(高丽)：高丽铁骑 - 坦克级的血量与冲锋
+        initUnit("KR_SPECIAL", 3, 65, 600, "CAVALRY", 1.5);
+        // GB(不列颠)：长弓勇士 - 极远距离压制 (英雄流辅助)
+        initUnit("GB_SPECIAL", 2, 40, 350, "HERO", 1.2);
 
         // --- 2. 武将模板初始化 (GeneralTemplate) ---
-        // 模板 101：赵云 (均衡型)
-        if (templateRepo.findById(101).isEmpty()) {
-            saveTemplate(101, "赵云", 60, 1500, "SSR");
-        }
-        // 模板 102：吕布 (极高攻击，割草型)
-        if (templateRepo.findById(102).isEmpty()) {
-            saveTemplate(102, "吕布", 100, 1800, "UR");
-        }
-        // 模板 103：关羽 (高血量，肉盾型)
-        if (templateRepo.findById(103).isEmpty()) {
-            saveTemplate(103, "关羽", 85, 1600, "SSR");
-        }
-        // 模板 104：诸葛亮 (低攻击，适合带EN特种兵走英雄流)
-        if (templateRepo.findById(104).isEmpty()) {
-            saveTemplate(104, "诸葛亮", 40, 1200, "SSR");
-        }
+        if (templateRepo.findById(101).isEmpty()) saveTemplate(101, "赵云", 65, 1600, "SSR");
+        if (templateRepo.findById(102).isEmpty()) saveTemplate(102, "吕布", 110, 2000, "UR");
+        if (templateRepo.findById(103).isEmpty()) saveTemplate(103, "关羽", 90, 1800, "SSR");
+        if (templateRepo.findById(104).isEmpty()) saveTemplate(104, "诸葛亮", 45, 1300, "SSR");
 
         // --- 3. 玩家存档初始化 (UserProfile) ---
         if (profileRepo.findById(1).isEmpty()) {
             UserProfile p = new UserProfile();
             p.setUserId(1);
-            p.setGold(5000);
+            p.setGold(8000);   // 给点初始启动资金
             p.setDiamond(500);
-            p.setUnlockedCountries(""); // 这里留空是触发前端跳转的关键
+            p.setUnlockedCountries(""); // 留空强制触发前端：文明选择页面
             profileRepo.save(p);
         }
 
         // --- 4. 战术关卡初始化 (StageConfig) ---
-        // 第一关：主打骑兵 (引导玩家用弓兵克制)
-        saveStage(1, "大鹿泽 (铁骑突袭)", 3000, "CAVALRY", 1.0);
-        // 第二关：主打步兵 (引导玩家用骑兵克制)
-        saveStage(2, "虎牢关外 (步兵方阵)", 4500, "INFANTRY", 1.1);
-        // 第三关：主打弓兵 (引导玩家用步兵克制)
-        saveStage(3, "长坂坡 (箭雨封锁)", 6000, "ARCHER", 1.2);
-        // 第十关：BOSS关 (综合难度)
-        saveStage(10, "下邳城 (战神吕布)", 15000, "CAVALRY", 1.5);
+        saveStage(1, "大鹿泽 (铁骑突袭)", 4000, "CAVALRY", 1.0);
+        saveStage(2, "虎牢关外 (步兵方阵)", 6000, "INFANTRY", 1.1);
+        saveStage(3, "长坂坡 (箭雨封锁)", 8000, "ARCHER", 1.2);
+        saveStage(5, "华容道 (曹操败走)", 12000, "CAVALRY", 1.4); // 第5关小BOSS
+        saveStage(10, "下邳城 (战神吕布)", 25000, "INFANTRY", 1.8); // 第10关大BOSS
 
         // --- 5. 测试初始武将 (给玩家一个初始赵云) ---
         if (generalRepo.findById(1).isEmpty()) {
@@ -83,21 +72,18 @@ public class DataInit implements CommandLineRunner {
             g.setUserId(1);
             g.setPersonality("BRAVE");
             g.setStatus("HEALTHY");
-            g.setBaseAtk(60);
-            g.setBaseHp(1500);
-            g.setMaxHp(1500);
-            g.setCurrentHp(1500);
+            g.setBaseAtk(65);
+            g.setBaseHp(1600);
+            g.setMaxHp(1600);
+            g.setCurrentHp(1600);
             g.setLevel(1);
-            g.setCurrentArmyCount(300); // 初始带300兵
+            g.setCurrentArmyCount(0); // 让玩家选完国家去招募特种兵
             generalRepo.save(g);
         }
 
-        System.out.println(">>> [系统初始化] 数据注入完成！");
+        System.out.println(">>> [系统初始化] 文明版数据注入完成！");
     }
 
-    /**
-     * 辅助方法：初始化兵种
-     */
     private void initUnit(String name, int cost, int atk, int hp, String target, double ratio) {
         if (unitRepo.findByUnitName(name).isEmpty()) {
             UnitConfig u = new UnitConfig();
@@ -111,9 +97,6 @@ public class DataInit implements CommandLineRunner {
         }
     }
 
-    /**
-     * 辅助方法：保存武将模板
-     */
     private void saveTemplate(int id, String name, int atk, int hp, String rarity) {
         GeneralTemplate t = new GeneralTemplate();
         t.setId(id);
@@ -124,21 +107,17 @@ public class DataInit implements CommandLineRunner {
         templateRepo.save(t);
     }
 
-    /**
-     * 辅助方法：快速保存关卡
-     */
     private void saveStage(int id, String name, int hp, String type, double atkBuff) {
         StageConfig stage = stageRepo.findById(id).orElse(new StageConfig());
         stage.setId(id);
-        stage.setRegionId(1); // 默认第一区域
+        stage.setRegionId(1);
         stage.setStageName(name);
         stage.setEnemyBaseHp(hp);
         stage.setMainEnemyType(type);
         stage.setEnemyAtkBuff(BigDecimal.valueOf(atkBuff));
-        stage.setGoldReward(200 + id * 100);
-        stage.setDiamondReward(5 + id);
-        // 掉率逻辑：普通关 10%，逢 5 的倍数关（BOSS）掉率提升到 50%
-        double loot = (id % 5 == 0) ? 0.5 : 0.1;
+        stage.setGoldReward(500 + id * 200);
+        stage.setDiamondReward(10 + id);
+        double loot = (id % 5 == 0) ? 0.6 : 0.15; // 提高BOSS关掉率
         stage.setLootRate(BigDecimal.valueOf(loot));
         stageRepo.save(stage);
     }
