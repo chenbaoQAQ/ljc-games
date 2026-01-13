@@ -89,4 +89,18 @@ public class GameController {
     public String strengthen(@RequestParam Integer userId, @RequestParam Integer equipId) {
         return weaponService.strengthenWeapon(userId, equipId);
     }
+    /**
+     * 选择国家接口：选择初始国家
+     */
+    @PostMapping("/choose-country")
+    public String chooseCountry(@RequestParam Integer userId, @RequestParam String country) {
+        UserProfile profile = profileRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        // 设置文明代码：CN(汉), JP(倭), KR(高丽), EN(英)
+        profile.setUnlockedCountries(country);
+        profileRepo.save(profile);
+
+        return "已成功加入文明：" + country;
+    }
 }

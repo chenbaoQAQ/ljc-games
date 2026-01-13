@@ -58,9 +58,9 @@ public class DataInit implements CommandLineRunner {
         if (profileRepo.findById(1).isEmpty()) {
             UserProfile p = new UserProfile();
             p.setUserId(1);
-            p.setGold(10000); // 初始金币给够，方便测试招募和强化
+            p.setGold(5000);
             p.setDiamond(500);
-            p.setUnlockedCountries("CN,JP,KR,EN");
+            p.setUnlockedCountries(""); // 这里留空是触发前端跳转的关键
             profileRepo.save(p);
         }
 
