@@ -106,9 +106,13 @@ public class GameController {
     }
 
     @PostMapping("/assign-troops")
-    public String assign(@RequestParam Integer generalId, @RequestBody Map<String, Integer> config) {
+    public String assign(@RequestParam Integer generalId, @RequestParam String config) {
         try {
-            return barracksService.assignTroops(generalId, config);
+            // 将前端传来的 JSON 字符串手动转为 Map
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            Map<String, Integer> assignmentMap = mapper.readValue(config, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Integer>>() {});
+
+            return barracksService.assignTroops(generalId, assignmentMap);
         } catch (Exception e) {
             return "分配报错: " + e.getMessage();
         }
