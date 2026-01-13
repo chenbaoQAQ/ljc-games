@@ -41,11 +41,10 @@ public class DataInit implements CommandLineRunner {
         initUnit("GB_SPECIAL", 2, 40, 350, "HERO", 1.2);
 
         // 修改后的 DataInit.java 调用代码
-        if (templateRepo.findById(101).isEmpty()) saveTemplate(101, "赵云", 65, 1600, 120, "SSR");
-        if (templateRepo.findById(102).isEmpty()) saveTemplate(102, "吕布", 110, 2000, 150, "UR");
-        if (templateRepo.findById(103).isEmpty()) saveTemplate(103, "关羽", 90, 1800, 150, "SSR");
-        if (templateRepo.findById(104).isEmpty()) saveTemplate(104, "诸葛亮", 45, 1300, 100, "SSR");
-
+        if (templateRepo.findById(101).isEmpty()) saveTemplate(101, "赵云", 65, 1600, 120, "SSR", "CN");
+        if (templateRepo.findById(102).isEmpty()) saveTemplate(102, "吕布", 110, 2000, 150, "UR", "CN");
+        if (templateRepo.findById(103).isEmpty()) saveTemplate(103, "关羽", 90, 1800, 150, "SSR", "CN");
+        if (templateRepo.findById(104).isEmpty()) saveTemplate(104, "诸葛亮", 45, 1300, 100, "SSR", "CN");
         // --- 3. 玩家存档初始化 (UserProfile) ---
         if (profileRepo.findById(1).isEmpty()) {
             UserProfile p = new UserProfile();
@@ -63,7 +62,7 @@ public class DataInit implements CommandLineRunner {
         saveStage(5, "华容道 (曹操败走)", 12000, "CAVALRY", 1.4); // 第5关小BOSS
         saveStage(10, "下邳城 (战神吕布)", 25000, "INFANTRY", 1.8); // 第10关大BOSS
 
-        // --- 5. 测试初始武将 (给玩家一个初始赵云) ---
+// --- 5. 测试初始武将 (给玩家一个初始赵云) ---
         if (generalRepo.findById(1).isEmpty()) {
             UserGeneral g = new UserGeneral();
             g.setId(1);
@@ -77,10 +76,13 @@ public class DataInit implements CommandLineRunner {
             g.setMaxHp(1600);
             g.setCurrentHp(1600);
             g.setLevel(1);
-            g.setCurrentArmyCount(0); // 让玩家选完国家去招募特种兵
+            g.setMaxLeadership(120);
+            g.setArmyConfigStr("{}");
+            g.setReserveArmyConfigStr("{}");
+
+            g.setCurrentArmyCount(0);
             generalRepo.save(g);
         }
-
         System.out.println(">>> [系统初始化] 文明版数据注入完成！");
     }
 
@@ -97,14 +99,15 @@ public class DataInit implements CommandLineRunner {
         }
     }
 
-    private void saveTemplate(int id, String name, int atk, int hp, int leadership, String rarity) {
+    private void saveTemplate(int id, String name, int atk, int hp, int leadership, String rarity, String country) {
         GeneralTemplate t = new GeneralTemplate();
         t.setId(id);
         t.setName(name);
         t.setBaseAtk(atk);
         t.setBaseHp(hp);
-        t.setBaseLeadership(leadership); // 注入带兵上限数据
+        t.setBaseLeadership(leadership);
         t.setRarity(rarity);
+        t.setCountry(country);
         templateRepo.save(t);
     }
 

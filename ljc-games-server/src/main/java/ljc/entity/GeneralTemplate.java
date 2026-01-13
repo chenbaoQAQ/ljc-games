@@ -14,4 +14,5 @@ public class GeneralTemplate {
     private Integer baseHp;
     private Integer baseLeadership;
     private String rarity;
+    private String country;
 }
