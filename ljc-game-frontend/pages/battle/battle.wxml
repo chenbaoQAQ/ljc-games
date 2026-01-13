@@ -1,18 +1,41 @@
 <view style="padding: 20px;">
   <view wx:if="{{!showBattle}}">
-    <view style="font-weight: bold; margin-bottom: 20rpx;">请指派主将出征：</view>
+    <view style="font-weight: bold; margin-bottom: 20rpx;">1. 选择出征主将：</view>
     <picker bindchange="bindGenChange" value="{{genIndex}}" range="{{generals}}" range-key="name">
-      <view style="padding: 30rpx; border: 2rpx solid #409EFF; text-align: center; border-radius: 10rpx;">
-        出征主将：{{generals[genIndex].name}}
+      <view style="padding: 30rpx; border: 2rpx solid #409EFF; text-align: center; border-radius: 10rpx; background: #fff;">
+        当前主将：{{generals[genIndex].name}}
       </view>
     </picker>
-    <button type="warn" style="margin-top: 40rpx;" bindtap="startBattle">擂鼓开战</button>
+
+    <view style="font-weight: bold; margin-top: 40rpx; margin-bottom: 20rpx;">2. 分配上阵兵力：</view>
+    <view style="background: #f9f9f9; padding: 20rpx; border-radius: 10rpx;">
+      <view style="display: flex; justify-content: space-between; font-size: 24rpx; margin-bottom: 10rpx;">
+        <text>统帅值占用</text>
+        <text style="color: {{currentSpace > maxLeadership ? 'red' : '#67C23A'}}">{{currentSpace}} / {{maxLeadership}}</text>
+      </view>
+      <progress percent="{{(currentSpace/maxLeadership)*100}}" stroke-width="6" color="{{currentSpace > maxLeadership ? 'red' : '#67C23A'}}" />
+
+      <view wx:for="{{troopAssignment}}" wx:key="name" style="display: flex; align-items: center; justify-content: space-between; margin-top: 20rpx; border-bottom: 1rpx solid #eee; padding-bottom: 10rpx;">
+        <view>
+          <view style="font-size: 28rpx;">{{item.label}}</view>
+          <view style="font-size: 22rpx; color: #999;">库存: {{item.reserve}} (占用: {{item.space}})</view>
+        </view>
+        <view style="display: flex; align-items: center;">
+          <input type="number" 
+                 value="{{item.assigned}}" 
+                 bindinput="onCountInput" 
+                 data-index="{{index}}" 
+                 style="width: 120rpx; border: 1rpx solid #ccc; text-align: center; border-radius: 6rpx; background: #fff; margin-right: 10rpx;"/>
+          <text style="font-size: 24rpx; color: #666;">人</text>
+        </view>
+      </view>
+    </view>
+
+    <button type="warn" style="margin-top: 40rpx;" bindtap="startBattle">确认分配并开战</button>
   </view>
 
   <scroll-view wx:else scroll-y="true" style="height: 80vh; background: #000; color: #0f0; padding: 20rpx; font-family: monospace;">
-    <view wx:for="{{logs}}" wx:key="index" style="margin-bottom: 10rpx;">
-      {{item}}
-    </view>
-    <button type="primary" style="margin-top: 20rpx;" bindtap="resetBattle">返回选将</button>
+    <view wx:for="{{logs}}" wx:key="index" style="margin-bottom: 10rpx;">{{item}}</view>
+    <button type="primary" style="margin-top: 20rpx;" bindtap="resetBattle">返回</button>
   </scroll-view>
 </view>
