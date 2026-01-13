@@ -22,7 +22,7 @@ public class UserGeneral {
     private int baseHp = 1000;
 
     // 增加最大统帅值字段，用于记录该武将当前的带兵上限
-    private int maxLeadership = 100;
+    private int maxLeadership;
 
     // 实时状态
     private int maxHp = 1000;
