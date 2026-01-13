@@ -25,9 +25,9 @@ public class BattleController {
     @GetMapping("/start")
     public List<String> startBattle(
             @RequestParam Integer userId,
-            @RequestParam Integer generalId,
+            @RequestParam Integer generalId, // 核心：接收选中的武将ID
             @RequestParam Integer stageId,
-            @RequestParam(required = false) String difficulty) { // 新增难度参数
+            @RequestParam(required = false) String difficulty){ // 新增难度参数
 
         try {
             StageConfig stage = stageRepository.findById(stageId)
