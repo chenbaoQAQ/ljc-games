@@ -1,80 +1,59 @@
 package ljc.service;
 
-import ljc.entity.GeneralTemplate;
 import ljc.entity.UserGeneral;
-import ljc.entity.UserProfile;
-import ljc.repository.GeneralTemplateRepository;
-import ljc.repository.UserGeneralRepository;
-import ljc.repository.UserProfileRepository;
+import ljc.entity.GeneralTemplate;
+import ljc.mapper.UserGeneralMapper; // 还没建，一会儿建
+import ljc.mapper.GeneralTemplateMapper; // 还没建，一会儿建
+import ljc.mapper.UserProfileMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Random;
 
 @Service
-// 抽卡中心：负责消耗钻石并为玩家生成新的武将实例
 public class GachaService {
 
     @Autowired
-    private GeneralTemplateRepository templateRepo;
+    private UserProfileMapper userProfileMapper;
+
+    // 假设下面两个 Mapper 我们一会儿就会创建
     @Autowired
-    private UserGeneralRepository generalRepo;
+    private GeneralTemplateMapper templateMapper;
     @Autowired
-    private UserProfileRepository profileRepo;
+    private UserGeneralMapper userGeneralMapper;
 
     private final Random random = new Random();
 
-    // 抽卡性格库
-    private final String[] personalities = {"BRAVE", "CALM", "RASH", "CAUTIOUS"};
-
     /**
-     * 单次抽卡逻辑
-     * @param userId 玩家ID
-     * @param cost 消耗钻石数
+     * 单抽逻辑
+     * 主公请填空：我们要保证扣钱和发武将要么都成功，要么都失败。
+     * 应该在方法上加什么注解？
      */
-    @Transactional
-    public UserGeneral drawGeneral(Integer userId, int cost) {
-        // 1. 检查并扣除钻石
-        UserProfile profile = profileRepo.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+    @Transactional(rollbackFor = Exception.class) // 👈 填空 1
+    public String drawGeneral(Integer userId) {
+        int cost = 100; // 单抽价格
 
-        if (profile.getDiamond() < cost) {
-            throw new RuntimeException("钻石不足，请去充值或通过关卡获得！");
+        // 1. 先扣钱 (利用刚才写的原子 SQL)
+        //int rows 是 MyBatis 执行 update 语句后的返回值
+        int rows = userProfileMapper.decreaseGold(userId, (long) cost);
+        if (rows == 0) {
+            throw new RuntimeException("金币不足，无法招募！");
         }
-        profile.setDiamond(profile.getDiamond() - cost);
-        profileRepo.save(profile);
 
-        // 2. 随机获取一个武将模版
-        List<GeneralTemplate> templates = templateRepo.findAll();
-        if (templates.isEmpty()) {
-            throw new RuntimeException("点将台目前没有武将模版，请先初始化数据！");
-        }
-        GeneralTemplate template = templates.get(random.nextInt(templates.size()));
+        // 2. 随机抽一个武将 (这里先简化，假设只有 ID 101 的赵云)
+        // 实际项目这里要读配置表算权重
+        int templateId = 101;
 
-        // 3. 实例化为玩家武将
+        // 3. 实例化武将 (发货)
         UserGeneral newGeneral = new UserGeneral();
         newGeneral.setUserId(userId);
-        newGeneral.setTemplateId(template.getId());
-        newGeneral.setName(template.getName());
-        newGeneral.setMaxHp(template.getBaseHp());
-        newGeneral.setCurrentHp(template.getBaseHp());
-        newGeneral.setBaseAtk(template.getBaseAtk()); // 记得同步基础攻击力
-        newGeneral.setBaseHp(template.getBaseHp());   // 记得同步基础血量
-
-        // 随机赋予一种性格
-        newGeneral.setPersonality(personalities[random.nextInt(personalities.length)]);
+        newGeneral.setTemplateId(templateId); // 关联到赵云模版
+        newGeneral.setName("赵云"); // 暂时写死，后续从 Template 表查
+        newGeneral.setMaxHp(1000); // 暂时写死
+        newGeneral.setCurrentHp(1000);
         newGeneral.setStatus("HEALTHY");
-        newGeneral.setLevel(1);
-        newGeneral.setCurrentExp(0);
 
-        // --- 核心逻辑：初始化兵力配置 ---
-        newGeneral.setArmyConfigStr("{}");           // 阵前（Active）初始化为空 JSON
-        newGeneral.setReserveArmyConfigStr("{}");    // 后备仓库（Reserve）初始化为空 JSON
-        newGeneral.setCurrentArmyCount(0);           // 初始上阵人数为 0
-        newGeneral.setMaxLeadership(template.getBaseLeadership()); // 设置动态统帅上限
-
-        return generalRepo.save(newGeneral);
+        return "招募成功";
     }
 }
