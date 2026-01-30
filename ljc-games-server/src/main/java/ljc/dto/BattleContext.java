@@ -36,7 +36,7 @@ public class BattleContext {
         private Map<String, TroopGroup> troops;
 
         /**
-         * 【修正：败北判定】
+         * 败北判定
          * 只要兵死光了，就算输。
          * 武将死活不影响“是否战败”，只影响兵的属性（亡语）。
          */
