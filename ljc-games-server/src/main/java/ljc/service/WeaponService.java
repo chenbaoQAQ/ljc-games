@@ -1,6 +1,5 @@
 package ljc.service;
 
-import ljc.entity.Equipment;
 import ljc.entity.UserProfile;
 import ljc.repository.EquipmentRepository;
 import ljc.repository.UserProfileRepository;

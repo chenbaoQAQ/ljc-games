@@ -4,8 +4,6 @@ import ljc.entity.UserGeneral;
 import ljc.entity.UserProfile;
 import ljc.repository.UserGeneralRepository;
 import ljc.repository.UserProfileRepository;
-import ljc.service.BarracksService; // 关键：导入兵营服务包
-import ljc.service.GachaService;
 import ljc.service.WeaponService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

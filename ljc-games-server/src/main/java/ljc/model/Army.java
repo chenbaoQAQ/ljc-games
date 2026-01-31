@@ -2,7 +2,6 @@ package ljc.model;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ljc.entity.UnitConfig;
 import ljc.repository.UnitConfigRepository;
 import ljc.service.CombatEngine;
 import lombok.Data;

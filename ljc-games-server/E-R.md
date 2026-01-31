@@ -1,41 +1,66 @@
 ```mermaid
 erDiagram
-    GENERAL_TEMPLATE ||--o{ USER_GENERAL : "is template of"
-    USER_ACCOUNT ||--o{ USER_GENERAL : "owns"
-    UNIT_CONFIG ||--o{ ARMY_SLOT : "defines"
-    USER_GENERAL ||--o{ ARMY_SLOT : "commands"
-
-    GENERAL_TEMPLATE {
-        int id PK "模版ID"
-        string name "武将名称"
-        string rarity "稀有度(SSR/UR)"
-        int base_leadership "基础统帅"
-        string country "所属文明"
+%% 核心国家与关卡
+    COUNTRY ||--o{ STAGE : "包含"
+    COUNTRY {
+        string name "CN/JP/KR/GB"
+        string special_soldier "特种兵类型"
+        bool is_unlocked "是否解锁"
     }
 
-    USER_GENERAL {
-        int id PK "实例ID"
-        int user_id FK "所属用户"
-        int template_id FK "模版关联"
-        string personality "性格(影响战损)"
+    STAGE {
+        int stage_id "1-10"
+        string type "WALL/NORMAL/BOSS"
+        int order "展示顺序"
+    }
+
+%% 武将系统
+    GENERAL ||--o{ EQUIPMENT : "穿戴"
+    GENERAL {
+        string name "武将名"
         int level "等级"
-        int current_exp "当前经验"
+        bool is_unlocked "是否解锁"
+        bool is_active "是否激活"
+        bool is_ascended "是否已升阶"
+        int capacity "统帅上限"
+        string personality "RETREAT/LAST_STAND"
+        string status "READY/RESTING"
     }
 
-    UNIT_CONFIG {
-        int id PK "兵种ID"
-        string unit_name "名称(刀/弓/骑/特)"
-        int space_cost "容量消耗(1/2/3)"
-        int base_atk "基础攻击"
-        int base_hp "基础血量"
-        string target_type "强化目标(Infantry/Hero...)"
-        float buff_ratio "强化倍率"
+%% 士兵系统
+    SOLDIER_INVENTORY ||--o{ GENERAL : "分配至"
+    SOLDIER_INVENTORY {
+        int inf_count "步兵数量"
+        int arc_count "弓兵数量"
+        int cav_count "骑兵数量"
+        int elite_count "特种兵数量"
     }
 
-    ARMY_SLOT {
-        int id PK "阵容ID"
-        int general_id FK "关联武将"
-        int unit_id FK "关联兵种"
-        int count "带兵数量"
+%% 装备与养成
+    EQUIPMENT ||--o{ SOCKET : "拥有孔位"
+    EQUIPMENT {
+        string slot "武器/防具/鞋/旗/符"
+        int enhance_level "强化等级(0-8)"
+        string blueprint_id "对应设计图"
+    }
+
+    SOCKET ||--|| GEM : "镶嵌"
+    GEM {
+        string type "ATK/HP"
+        int level "1-5级"
+    }
+
+%% 爬塔模式
+    TOWER ||--o{ TOWER_LEVEL : "包含"
+    TOWER_LEVEL {
+        int floor "1-100层"
+        string reward_pool "设计图/材料/金币"
+    }
+
+%% 资源类 (非实体，但在逻辑中重要)
+    RESOURCES {
+        int gold "金币"
+        int materials "材料"
+        int blueprints "设计图"
     }
 ```

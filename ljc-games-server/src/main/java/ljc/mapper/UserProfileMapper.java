@@ -6,18 +6,15 @@ import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface UserProfileMapper {
+    // 查档案
+    UserProfile selectById(@Param("userId") Long userId);
 
-    // 基础查询：根据 ID 查玩家
-    UserProfile selectById(@Param("userId") Integer userId);
+    // 初始化/插入
+    int insert(UserProfile profile);
 
-    // 基础更新：保存玩家所有信息
-    int update(UserProfile userProfile);
+    // 扣金币 (CAS乐观锁)
+    int decreaseGold(@Param("userId") Long userId, @Param("delta") Long delta);
 
-    /**
-     * 【核心防御】扣减金币
-     * @param userId 玩家ID
-     * @param delta 扣多少钱 (正数)
-     * @return 1=扣款成功, 0=余额不足或失败
-     */
-    int decreaseGold(@Param("userId") Integer userId, @Param("delta") Long delta);
+    // 扣材料 (新增)
+    int decreaseMaterial(@Param("userId") Long userId, @Param("delta") Long delta);
 }
