@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="ljc.mapper.UserMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users
+        (username, password_hash, nickname, gold, diamond, stamina, initial_civ, created_at)
+        VALUES
+            (#{username}, #{passwordHash}, #{nickname}, #{gold}, #{diamond}, #{stamina}, #{initialCiv}, NOW())
+    </insert>
+
+    <select id="selectByUsername" resultType="ljc.entity.UserTbl">
+        SELECT * FROM users WHERE username = #{username}
+    </select>
+
+    <select id="selectById" resultType="ljc.entity.UserTbl">
+        SELECT * FROM users WHERE id = #{id}
+    </select>
+
+</mapper>
