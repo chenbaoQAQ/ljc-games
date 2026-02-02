@@ -3,8 +3,8 @@ POST http://localhost:8080/auth/register
 Content-Type: application/json
 
 {
-  "username": "liubei01",
+  "username": "li",
   "password": "123",
-  "nickname": "玄德公",
+  "nickname": "李俊辰",
   "initialCiv": "CN"
 }

@@ -72,7 +72,10 @@ public class PlayerInitService {
         general.setCurrentHp(tpl.getBaseHp());       // 从模板抄基础血量
         general.setMaxHp(tpl.getBaseHp());           // 从模板抄最大血量
         general.setCapacity(tpl.getBaseCapacity());  // 从模板抄带兵量
-
+        // 阶数默认为 0
+        general.setTier(0);
+        // 休息回合默认为 0
+        general.setRestTurns(0);
         // D. 插入武将: userGeneralMapper.insert(general);
         userGeneralMapper.insert(general);
 
