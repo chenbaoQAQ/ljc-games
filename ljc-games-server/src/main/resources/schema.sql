@@ -348,5 +348,3 @@ CREATE TABLE tower_floor_config (
                                     enemy_troop_comp_json JSON NOT NULL,
                                     drop_pool_id INT NOT NULL
 ) ENGINE=InnoDB;
-
-CREATE DATABASE ljc_sanguo CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;写·

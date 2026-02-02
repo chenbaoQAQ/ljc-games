@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ljc.mapper.UserCivProgressMapper">
+    <insert id="insert">
+        INSERT INTO user_civ_progress (user_id, civ, unlocked, max_stage_cleared)
+        VALUES (#{userId}, #{civ}, #{unlocked}, #{maxStageCleared})
+    </insert>
+</mapper>

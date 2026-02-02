@@ -1,0 +1,10 @@
+### 测试注册接口
+POST http://localhost:8080/auth/register
+Content-Type: application/json
+
+{
+  "username": "liubei01",
+  "password": "123",
+  "nickname": "玄德公",
+  "initialCiv": "CN"
+}
