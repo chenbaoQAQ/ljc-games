@@ -18,7 +18,7 @@ public class PlayerInitService {
 
     // 常量配置
     private static final int START_GENERAL_ID = 1001; // 初始武将ID
-    private static final int START_TROOP_ID = 1;      // 义勇兵ID
+    private static final int START_TROOP_ID = 1001;      // 义勇兵ID
     private static final int START_TROOP_COUNT = 100; // 送100个
 
     /**

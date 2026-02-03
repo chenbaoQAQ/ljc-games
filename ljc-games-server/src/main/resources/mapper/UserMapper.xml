@@ -10,6 +10,12 @@
             (#{username}, #{passwordHash}, #{nickname}, #{gold}, #{diamond}, #{stamina}, #{initialCiv}, NOW())
     </insert>
 
+    <update id="reduceGold">
+        UPDATE users
+        SET gold = gold - #{cost}
+        WHERE id = #{userId} AND gold >= #{cost}
+    </update>
+
     <select id="selectByUsername" resultType="ljc.entity.UserTbl">
         SELECT * FROM users WHERE username = #{username}
     </select>

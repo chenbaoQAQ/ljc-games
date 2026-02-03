@@ -8,4 +8,9 @@
     <select id="selectByUserId" resultType="ljc.entity.UserTroopTbl">
         SELECT * FROM user_troops WHERE user_id = #{userId}
     </select>
+    <update id="addTroopCount">
+        UPDATE user_troops
+        SET count = count + #{count}
+        WHERE user_id = #{userId} AND troop_id = #{troopId}
+    </update>
 </mapper>

@@ -9,7 +9,7 @@ INSERT INTO skill_template (skill_id, name, description, skill_type, trigger_tim
 
 -- 3. 插入初始兵种 (义勇兵)
 INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, base_atk, base_hp, recruit_gold_cost, unlock_civ_required) VALUES
-    (1, 'CN', '义勇兵', 'INF', 0, 1, 10, 50, 10, 0);
+    (1001, 'CN', '义勇兵', 'INF', 0, 1, 10, 50, 10, 0);
 
 -- 4. 插入初始武将 (关键！ID=1001)
 INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
