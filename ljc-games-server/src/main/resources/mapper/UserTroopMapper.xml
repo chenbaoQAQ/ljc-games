@@ -5,4 +5,7 @@
         INSERT INTO user_troops (user_id, troop_id, count)
         VALUES (#{userId}, #{troopId}, #{count})
     </insert>
+    <select id="selectByUserId" resultType="ljc.entity.UserTroopTbl">
+        SELECT * FROM user_troops WHERE user_id = #{userId}
+    </select>
 </mapper>

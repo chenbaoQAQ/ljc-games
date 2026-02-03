@@ -1,5 +1,6 @@
 package ljc.service;
 
+import ljc.controller.dto.LoginReq;
 import ljc.controller.dto.RegisterReq;
 import ljc.entity.UserTbl;
 import ljc.mapper.UserMapper;
@@ -40,6 +41,27 @@ public class AuthService {
         // 这一步如果不成功，上面的 userMapper.insert 也会自动回滚（撤销），因为有 @Transactional
         playerInitService.initPlayerData(newUserId, req.getInitialCiv());
 
+        return user;
+    }
+    /**
+     * 登录逻辑
+     */
+    public UserTbl login(LoginReq req) {
+        // 1. 去数据库查这个人
+        UserTbl user = userMapper.selectByUsername(req.getUsername());
+
+        // 2. 如果查不到 (user is null)
+        if (user == null) {
+            throw new RuntimeException("登录失败：账号不存在");
+        }
+
+        // 3. 如果查到了，比对密码
+        // 注意：数据库里的密码是 user.getPasswordHash()，前端传的是 req.getPassword()
+        if (!user.getPasswordHash().equals(req.getPassword())) {
+            throw new RuntimeException("登录失败：密码错误");
+        }
+
+        // 4. 全部通过，返回用户信息
         return user;
     }
 }

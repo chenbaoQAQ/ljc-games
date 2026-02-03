@@ -7,4 +7,7 @@
         VALUES
             (#{userId}, #{templateId}, #{unlocked}, #{activated}, #{level}, #{tier}, #{currentHp}, #{maxHp}, #{restTurns}, #{capacity}, NOW())
     </insert>
+    <select id="selectByUserId" resultType="ljc.entity.UserGeneralTbl">
+        SELECT * FROM user_generals WHERE user_id = #{userId}
+    </select>
 </mapper>
