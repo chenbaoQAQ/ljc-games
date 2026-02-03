@@ -276,6 +276,7 @@ CREATE TABLE general_template (
                                   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                   CONSTRAINT fk_gt_personality FOREIGN KEY (personality_code) REFERENCES personality_config(personality_code)
 ) ENGINE=InnoDB;
+ALTER TABLE general_template ADD COLUMN speed INT DEFAULT 50 COMMENT '速度';
 
 CREATE TABLE troop_template (
                                 troop_id INT PRIMARY KEY,

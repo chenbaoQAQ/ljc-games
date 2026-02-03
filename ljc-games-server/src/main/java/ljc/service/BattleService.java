@@ -1,12 +1,8 @@
 package ljc.service;
 
 import ljc.controller.dto.StartBattleReq;
-import ljc.entity.UserGeneralTbl;
-import ljc.entity.UserTbl;
-import ljc.entity.UserTroopTbl;
-import ljc.mapper.UserGeneralMapper;
-import ljc.mapper.UserMapper;
-import ljc.mapper.UserTroopMapper;
+import ljc.entity.*;
+import ljc.mapper.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +17,8 @@ public class BattleService {
     private final UserMapper userMapper;
     private final UserGeneralMapper userGeneralMapper;
     private final UserTroopMapper userTroopMapper;
+    private final GeneralTemplateMapper generalTemplateMapper;
+    private final TroopTemplateMapper troopTemplateMapper;
 
     @Transactional
     public String startBattle(Long userId, StartBattleReq req) {
@@ -74,7 +72,8 @@ public class BattleService {
 
                 // 2. 比：够不够？
                 if (haveCount < wantCount) {
-                    throw new RuntimeException("兵力不足！兵种ID:" + wantTroopId + " 需要:" + wantCount + " 实际拥有:" + haveCount);
+                    throw new RuntimeException
+                            ("兵力不足！兵种ID:" + wantTroopId + " 需要:" + wantCount + " 实际拥有:" + haveCount);
                 }
 
                 // 3. 扣：去数据库执行扣除！
@@ -83,23 +82,64 @@ public class BattleService {
                 userTroopMapper.addTroopCount(userId, Long.valueOf(wantTroopId), -wantCount);
             }
         }
-        // ---------------------------------------------------------
-        // 4. 模拟战斗结果 (暂时先直接判赢)
-        // 以后这里会写复杂的战斗计算公式
-        boolean isWin = true;
+        // --- 第 4 步：计算我方总战斗力 (ATK 和 HP) ---
+        long myTotalAtk = 0;
+        long myTotalHp = 0;
 
-        // 5. 发放奖励 (赢了给 100 金币)
-        if (isWin) {
-            // 骚操作：利用 reduceGold 扣除“负数”，负负得正，就变成了加钱
-            // 原理：Update set gold = gold - (-100)  =>  gold + 100
-            int rows = userMapper.reduceGold(userId, -100);
+        GeneralTemplateTbl genTpl = generalTemplateMapper.selectById(general.getTemplateId());
 
-            if (rows == 0) {
-                // 如果返回0，说明可能正好碰到极低概率的并发问题，或者账号被删了，暂时忽略
-                System.out.println("奖励发放异常，可能是账号不存在");
+        long genAtk = genTpl.getBaseAtk() + (general.getLevel() * 5);
+
+        myTotalAtk += genAtk;
+        myTotalHp += general.getCurrentHp();
+
+        if (troopsToTake != null) {
+            // 必须加这个循环！把清单里的每一项拿出来
+            for (Map.Entry<Integer, Integer> entry : troopsToTake.entrySet()) {
+
+                // 1. 在这里定义 troopId 变量 (从 Map 的 Key 里取)
+                Integer troopId = entry.getKey();
+                Integer count = entry.getValue(); // 顺便把数量也取出来
+
+                if (count <= 0) continue;
+
+                TroopTemplateTbl troopTpl = troopTemplateMapper.selectById(troopId);
+
+                // 3. 接着算属性...
+                myTotalAtk += troopTpl.getBaseAtk() * count;
+                myTotalHp += troopTpl.getBaseHp() * count;
             }
         }
 
-        return isWin ? "战斗胜利！掠夺了 100 金币" : "战斗失败，兵力全军覆没...";
+
+        // --- 第 5 步：定义敌人 (第一关山贼) ---
+        // 暂时写死：血量 500，攻击 50
+        long enemyHp = 500;
+        long enemyAtk = 50;
+
+
+        // --- 第 6 步：死斗循环 (最热血的部分) ---
+        // 提示：写一个 while(true) 循环
+        // 每一轮：
+        //    1. 敌人掉血：enemyHp -= myTotalAtk
+        //    2. 判断敌人死没死？(enemyHp <= 0) -> 死了就 break (isWin = true)
+        //    3. 我方掉血：myTotalHp -= enemyAtk
+        //    4. 判断我方死没死？(myTotalHp <= 0) -> 死了就 break (isWin = false)
+        //    5. (可选) 防止死循环，加个回合数限制，超过20回合强制判输
+
+        boolean isWin = false;
+        StringBuilder log = new StringBuilder("战斗开始...\n"); // 用来记录战报
+
+        // (在这里写 while 循环...)
+
+
+        // --- 第 7 步：结算发奖 ---
+        if (isWin) {
+            // 赢了！给钱 (reduceGold 传负数)
+            userMapper.reduceGold(userId, -100);
+            return log.toString() + "\n【胜利】获得 100 金币！";
+        } else {
+            return log.toString() + "\n【失败】全军覆没...";
+        }
     }
 }
