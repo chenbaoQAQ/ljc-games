@@ -1,19 +1,23 @@
 package ljc.controller.dto;
 
-import ljc.entity.UserGeneralTbl;
-import ljc.entity.UserTbl;
-import ljc.entity.UserTroopTbl;
 import lombok.Data;
 import java.util.List;
 
 @Data
 public class PlayerInfoResp {
-    // 1. 玩家本体信息
-    private UserTbl userInfo;
+    // 1. 基础信息 (把 UserTbl 里的东西拆出来放)
+    private Long id;
+    private String nickname;
+    private Long gold;      // 注意：UserTbl里是 Long
+    private Long diamond;   // 注意：UserTbl里是 Long
 
-    // 2. 玩家拥有的武将列表 (List代表可能有多个)
-    private List<UserGeneralTbl> generals;
+    // 2. 兵力列表 (只给前端看 ID 和 数量)
+    private List<TroopDto> troops;
 
-    // 3. 玩家拥有的兵力列表
-    private List<UserTroopTbl> troops;
+    // 内部类：简单的兵力展示对象
+    @Data
+    public static class TroopDto {
+        private Integer troopId; // 对应 UserTroopTbl.troopId
+        private Long count;      // 对应 UserTroopTbl.count
+    }
 }
