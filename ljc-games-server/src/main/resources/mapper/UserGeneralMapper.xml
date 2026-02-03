@@ -10,4 +10,7 @@
     <select id="selectByUserId" resultType="ljc.entity.UserGeneralTbl">
         SELECT * FROM user_generals WHERE user_id = #{userId}
     </select>
+    <select id="selectById" resultType="ljc.entity.UserGeneralTbl">
+        SELECT * FROM user_generals WHERE id = #{id}
+    </select>
 </mapper>
