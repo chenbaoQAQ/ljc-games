@@ -1,8 +1,9 @@
 package ljc.controller;
 
 import ljc.common.Result;
-import ljc.controller.dto.StartBattleReq;
+import ljc.context.BattleContext;
 import ljc.service.BattleService;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,29 +14,20 @@ public class BattleController {
 
     private final BattleService battleService;
 
-    // 宣战接口
-    // POST http://localhost:8080/battle/start?userId=1
     @PostMapping("/start")
-    public Result<String> startBattle(@RequestParam Long userId, @RequestBody StartBattleReq req) {
-        try {
-            String battleResult = battleService.startBattle(userId, req);
-            return Result.success(battleResult);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+    public Result<Long> startBattle(@RequestParam Long userId, @RequestParam Integer dungeonId) {
+        Long battleId = battleService.startBattle(userId, dungeonId);
+        return Result.success(battleId);
     }
 
-    @PostMapping("/action")
-    public Result<String> battleAction(@RequestParam Long userId, @RequestBody BattleActionReq req) { // Create DTO if needed or use Map
-        // Simple DTO: sessionId
-        battleService.processTurn(userId, req.getSessionId());
-        return Result.success("回合推进成功");
+    @PostMapping("/turn")
+    public Result<BattleContext> processTurn(@RequestParam Long userId, @RequestBody TurnReq req) {
+        BattleContext ctx = battleService.processTurn(userId, req.getCastSkill());
+        return Result.success(ctx);
     }
 
-    @lombok.Data
-    public static class BattleActionReq {
-        private String sessionId;
-        private String actionType;
+    @Data
+    public static class TurnReq {
+        private Boolean castSkill;
     }
-
 }

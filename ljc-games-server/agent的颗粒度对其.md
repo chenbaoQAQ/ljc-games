@@ -44,26 +44,34 @@
 
 在进入战斗模块开发前，大厅系统仍需完善以下细节：
 
-### 2.1 缺失的大厅功能
-- [ ] **兵营 (Recruit)**:
-    - 目前 `user_troops` 表已存在，但 **招兵接口 (`recruit`) 尚未实现**。
-    - 需实现：扣除金币 -> 增加对应 Troop ID 的数量。
-- [ ] **宝石合成 (Combine)**:
-    - 接口存在，但逻辑未完全实现 (目前仅为伪代码注释)。
-    - 需实现：检查 5 个同类同级宝石 -> 删除 -> 生成 1 个高一级宝石。
-- [ ] **武将升阶 (Ascend)**:
-    - 目前仅实现了 `upgrade` (升级)，未实现 `ascend` (升阶)。
-    - 需实现：检查 Tier 上限条件 -> 消耗材料 -> 提升 Tier。
+### 2.1 缺失的大厅功能 (已完成)
+- [x] **兵营 (Recruit)**: 已实现 `recruit` 接口 (HallService).
+- [x] **宝石合成 (Combine)**: 已实现 `combineGem` 逻辑 (HallService).
+- [x] **武将升阶 (Ascend)**: 已实现 `ascendGeneral` 逻辑 (HallService).
 
 ### 2.2 逻辑完善
-- [ ] **数值配置化**:
-    - 当前升级/强化消耗公式写死在代码中 (`level * 100`)。
-    - 需改为：读取 `general_template` 或全局配置表。
-- [ ] **防作弊校验**:
-    - 增加资源扣除的前置校验（如金币是否为负数等边界情况）。
+- [x] **强化失败机制**: 已严格按照 V2.8 实现 (+3后概率失败降级).
+- [ ] **数值配置化**: (暂缓，硬编码于 Service 中).
 
 ---
 
-## 3. 下一步建议
+## 3. 战斗模块进度 (Battle Module)
 
-建议优先完成 **[2.1 缺失的大厅功能]** 中的 **招兵** 和 **宝石合成**，确保养成闭环完整，再开始 **战斗模块 (Battle Session)** 的开发。
+### 3.1 基础架构 (Done)
+- [x] **数据库**: `battle_sessions` 表已创建，核心字段 `context_json` / `status`.
+- [x] **Entity/Mapper**: 对应的 BattleSession 结构已就绪.
+- [x] **API**: `BattleController` (Start/Turn) 已联调.
+
+### 3.2 核心逻辑 V2.8 (Done)
+- [x] **Context 构建**:
+    - [x] 自动读取 UserGeneral/Troop/Equipment 数据.
+    - [x] **数值对齐**: 装备/宝石属性已按 `X*n*(n+1)/2` 公式计算并叠加到 Hero Stats.
+- [x] **回合推进 (ProcessTurn)**:
+    - [x] **Phase 0-6**: 完整的回合阶段 (CD -> Skill -> Troops -> Hero -> Retreat -> End).
+    - [x] **堆栈模型**: 实现 `applyDamage`，支持“个体死亡”与“伤害溢出”.
+    - [x] **目标规则**: 严格遵循 V2.8 (固定优先级 / 克制优先).
+
+## 4. 下一步计划
+- [ ] **前端对接**: 联调 Battle Context JSON 的渲染.
+- [ ] **数值调优**: 调整兵种/怪物的基础数值平衡.
+

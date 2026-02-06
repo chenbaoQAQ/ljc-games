@@ -11,4 +11,8 @@ public interface UserGemMapper {
     int update(UserGemTbl gem);
     UserGemTbl selectById(@Param("id") Long id);
     List<UserGemTbl> selectByUserId(@Param("userId") Long userId);
+
+    List<UserGemTbl> selectForSynthesis(@Param("userId") Long userId, @Param("gemType") String gemType, @Param("gemLevel") Integer gemLevel);
+
+    int deleteBatch(@Param("ids") List<Long> ids);
 }

@@ -63,6 +63,36 @@ public class HallController {
         hallService.learnSkill(userId, generalId, bookItemId);
         return Result.success("学习成功");
     }
+
+    @PostMapping("/recruit")
+    public Result<String> recruit(@RequestParam Long userId, @RequestBody RecruitReq req) {
+        hallService.recruit(userId, req.getTroopId(), req.getCount());
+        return Result.success("招募成功");
+    }
+
+    @Data
+    public static class RecruitReq {
+        private Integer troopId;
+        private Integer count;
+    }
+
+    @PostMapping("/gem/combine")
+    public Result<String> combineGem(@RequestParam Long userId, @RequestBody CombineGemReq req) {
+        hallService.combineGem(userId, req.getGemType(), req.getLevel());
+        return Result.success("合成成功");
+    }
+
+    @Data
+    public static class CombineGemReq {
+        private String gemType;
+        private Integer level;
+    }
+
+    @PostMapping("/general/ascend")
+    public Result<String> ascendGeneral(@RequestParam Long userId, @RequestParam Long generalId) {
+        hallService.ascendGeneral(userId, generalId);
+        return Result.success("升阶成功");
+    }
 }
 
 

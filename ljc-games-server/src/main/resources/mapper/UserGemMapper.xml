@@ -21,4 +21,20 @@
         SELECT * FROM user_gems WHERE user_id = #{userId} AND is_used = 0
     </select>
 
+    <select id="selectForSynthesis" resultType="ljc.entity.UserGemTbl">
+        SELECT * FROM user_gems
+        WHERE user_id = #{userId}
+          AND gem_type = #{gemType}
+          AND gem_level = #{gemLevel}
+          AND is_used = 0
+        LIMIT 5
+    </select>
+
+    <delete id="deleteBatch">
+        DELETE FROM user_gems WHERE id IN
+        <foreach item="item" index="index" collection="ids" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </delete>
+
 </mapper>

@@ -63,6 +63,36 @@ curl -X POST "http://localhost:8080/hall/general/equip?userId=1" \
 curl -X POST "http://localhost:8080/hall/skill/learn?userId=1&generalId=1&bookItemId=301"
 ```
 
+### 1.3 资源与招募
+
+#### 招兵 (Recruit)
+*消耗金币招募兵种 (ID=1001), 数量=10*
+```bash
+curl -X POST "http://localhost:8080/hall/recruit?userId=1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "troopId": 1001,
+    "count": 10
+  }'
+```
+
+#### 宝石合成 (Combine Gem)
+*消耗5颗同类同级宝石合成高一级宝石*
+```bash
+curl -X POST "http://localhost:8080/hall/gem/combine?userId=1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gemType": "ATK",
+    "level": 1
+  }'
+```
+
+#### 武将升阶 (Ascend)
+*消耗金币提升武将阶数 (Break Limit)*
+```bash
+curl -X POST "http://localhost:8080/hall/general/ascend?userId=1&generalId=1"
+```
+
 ### 1.2 装备与宝石
 
 #### 强化装备 (Enhance)
@@ -87,32 +117,27 @@ curl -X POST "http://localhost:8080/hall/gem/inlay?userId=1" \
 
 ## 2. 战斗框架 (Battle)
 
-### 开始战斗 (Start)
-*创建一场新战斗会话*
-```bash
-curl -X POST "http://localhost:8080/battle/start?userId=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "generalId": 1,
-    "stageId": 101,
-    "troopConfig": {
-      "1001": 10
-    }
-  }'
-```
-> **注意**: 响应中的 `sessionId` 需要记录下来，用于后续的回合推进接口。
+> **重要提示**: 战斗模块依赖新的数据库表。请务必先执行以下 SQL 脚本：
+> `src/main/resources/schema_update_battle.sql`
 
-### 回合行动 (Action)
-*推进到下一回合 (示例中使用 SKIP 跳过)*
+
+### 开始战斗 (Start)
+*创建一场新战斗会话 (Session)*
 ```bash
-# 请将 <SESSION_ID> 替换为 开始战斗 接口返回的值
-curl -X POST "http://localhost:8080/battle/action?userId=1" \
+curl -X POST "http://localhost:8080/battle/start?userId=1&dungeonId=101"
+```
+> **注意**: 响应中的 `data` 即为 `battleId` (虽然实际逻辑使用 userId 查找会话，但 ID 可用于展示).
+
+### 回合行动 (Action / Turn)
+*推进到下一回合 (可选择是否施放技能)*
+```bash
+curl -X POST "http://localhost:8080/battle/turn?userId=1" \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionId": "<SESSION_ID>",
-    "actionType": "SKIP"
+    "castSkill": true
   }'
 ```
+*响应包含了当前的 Context 快照，可用于前端复现战斗画面。*
 
 ---
 
