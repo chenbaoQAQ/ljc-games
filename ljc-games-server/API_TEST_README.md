@@ -7,9 +7,12 @@
 > 2. `data.sql` 已包含基础数据 (启动后自动加载)。
 > 3. 默认主机: `http://localhost:8080` (在 Apifox 中建议配置为环境变量 `{{baseUrl}}`)。
 
+## 0. 数据重置 (Reset Data)
+*如果遇到数据异常或想要重头开始，请重启服务器，或重新运行 `src/main/resources/data.sql` 脚本（已支持热重置）。*
+
 ---
 
-## 0. 账号体系 (Auth)
+## 1. 账号体系 (Auth)
 
 该系统现已预置测试账号 (`userId=1`)。如需创建新号，请使用注册接口。
 
@@ -137,7 +140,7 @@ curl -X POST "http://localhost:8080/battle/turn?userId=1" \
     "castSkill": true
   }'
 ```
-*响应包含了当前的 Context 快照，可用于前端复现战斗画面。*
+*响应包含了当前的 Context 快照，以及 **logs** 字段，记录了本回合详细的战斗日志（扣血、技能释放、撤退等）。*
 
 ---
 

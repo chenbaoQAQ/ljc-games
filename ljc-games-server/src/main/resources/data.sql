@@ -1,3 +1,20 @@
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- 0. 清理旧数据 (防止主键冲突)
+DELETE FROM story_stage_config;
+DELETE FROM user_inventory;
+DELETE FROM skill_book_map;
+DELETE FROM user_gems;
+DELETE FROM user_equipments;
+DELETE FROM user_generals;
+DELETE FROM users;
+DELETE FROM gem_template;
+DELETE FROM equipment_template;
+DELETE FROM general_template;
+DELETE FROM troop_template;
+DELETE FROM skill_template;
+DELETE FROM personality_config;
+
 -- 1. 先插入性格 (否则插武将会报错外键错误)
 INSERT INTO personality_config (personality_code, display_name, deal_mult, taken_mult, rescue_rate_bonus, last_stand_bias, roll_bias, roll_variance_scale, note) VALUES
                                                                                                                                                                      ('STOIC', '中庸', 1000, 1000, 0, 0, 0, 1000, '白板'),
@@ -9,12 +26,15 @@ INSERT INTO skill_template (skill_id, name, description, skill_type, trigger_tim
 
 -- 3. 插入初始兵种 (义勇兵)
 INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, base_atk, base_hp, recruit_gold_cost, unlock_civ_required) VALUES
-    (1001, 'CN', '义勇兵', 'INF', 0, 1, 10, 50, 10, 0);
+    (1001, 'CN', '义勇兵', 'INF', 0, 1, 10, 50, 10, 0),
+    (2001, 'CN', '步兵', 'INF', 0, 1, 15, 60, 20, 0),
+    (2002, 'CN', '弓兵', 'ARC', 0, 1, 20, 40, 20, 0),
+    (2003, 'CN', '骑兵', 'CAV', 0, 2, 25, 80, 40, 0);
 
 -- 4. 插入初始武将 (关键！ID=1001)
-INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
-    (1001, 'CN', '新手主公', 50, 500, 5, 'STOIC', 0, 10, 1),
-    (1002, 'CN', '未激活武将', 60, 600, 5, 'BERSERKER', 1000, 10, 1);
+INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
+    (1001, 'CN', '新手主公', 50, 500, 5, 50, 'STOIC', 0, 10, 1),
+    (1002, 'CN', '未激活武将', 60, 600, 5, 45, 'BERSERKER', 1000, 10, 1);
 
 -- 5. 插入装备模板
 INSERT INTO equipment_template (template_id, slot, name, base_atk, base_hp, base_spd, base_capacity, enhance_growth_json) VALUES
@@ -53,3 +73,21 @@ INSERT INTO skill_book_map (item_id, skill_id) VALUES (301, 1);
 
 INSERT INTO user_inventory (user_id, item_id, count) VALUES
     (1, 301, 10); -- 10本技能书
+
+-- 9. 故事模式关卡配置 (CN 1-10)
+-- 简单起见，所有关卡敌人配置类似，只是属性倍率不同
+-- enemy_config_json 包含 hero 和 troops
+-- 格式: { "hero": {...}, "troops": [...] }
+INSERT INTO story_stage_config (civ, stage_no, stage_type, stamina_cost, wall_cost_troops, enemy_multiplier, drop_pool_id, enemy_troop_comp_json) VALUES
+('CN', 1, 'NORMAL', 10, 0, 1000, 1, '{"hero":{"name":"山贼头目","maxHp":1000,"currentHp":1000,"atk":50,"speed":40,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":10,"unitHp":20,"frontHp":20}]}'),
+('CN', 2, 'NORMAL', 10, 0, 1100, 1, '{"hero":{"name":"黄巾小队长","maxHp":1200,"currentHp":1200,"atk":60,"speed":45,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":20,"unitHp":20,"frontHp":20}]}'),
+('CN', 3, 'NORMAL', 10, 0, 1200, 1, '{"hero":{"name":"黄巾猛将","maxHp":1500,"currentHp":1500,"atk":70,"speed":50,"personality":"BERSERKER"},"troops":[{"troopId":2001,"type":"INF","count":30,"unitHp":20,"frontHp":20}]}'),
+('CN', 4, 'NORMAL', 10, 0, 1300, 1, '{"hero":{"name":"黄巾军师","maxHp":1000,"currentHp":1000,"atk":100,"speed":60,"personality":"STOIC"},"troops":[{"troopId":2002,"type":"ARC","count":20,"unitHp":15,"frontHp":15}]}'),
+('CN', 5, 'WALL',   15, 50, 1500, 2, '{"hero":{"name":"城门守将","maxHp":3000,"currentHp":3000,"atk":80,"speed":30,"personality":"STOIC"},"troops":[{"troopId":2002,"type":"ARC","count":50,"unitHp":20,"frontHp":20}]}'),
+('CN', 6, 'NORMAL', 10, 0, 1600, 2, '{"hero":{"name":"西凉前锋","maxHp":2000,"currentHp":2000,"atk":90,"speed":70,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":20,"unitHp":30,"frontHp":30}]}'),
+('CN', 7, 'NORMAL', 10, 0, 1700, 2, '{"hero":{"name":"西凉铁骑","maxHp":2500,"currentHp":2500,"atk":95,"speed":75,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":30,"unitHp":30,"frontHp":30}]}'),
+('CN', 8, 'NORMAL', 10, 0, 1800, 2, '{"hero":{"name":"虎牢关守卫","maxHp":3000,"currentHp":3000,"atk":100,"speed":50,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":50,"unitHp":25,"frontHp":25}]}'),
+('CN', 9, 'WALL',   15, 100,2000, 3, '{"hero":{"name":"华雄","maxHp":5000,"currentHp":5000,"atk":150,"speed":80,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":50,"unitHp":40,"frontHp":40}]}'),
+('CN', 10,'BOSS',   20, 0,  2500, 5, '{"hero":{"name":"吕布","maxHp":10000,"currentHp":10000,"atk":300,"speed":100,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":100,"unitHp":50,"frontHp":50}]}');
+
+SET FOREIGN_KEY_CHECKS = 1;

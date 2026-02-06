@@ -11,6 +11,7 @@ public class GeneralTemplateTbl {
     private Long baseAtk;
     private Long baseHp;
     private Integer baseCapacity;
+    private Integer speed;
     private String personalityCode;
     private Long activateGoldCost;
     private Integer maxLevelTier0;

@@ -226,6 +226,9 @@ public class HallService {
         }
     }
 
+    private final SkillBookMapMapper skillBookMapMapper;
+    private final SkillLearnLogMapper skillLearnLogMapper;
+
     @Transactional(rollbackFor = Exception.class)
     public void learnSkill(Long userId, Long generalId, Integer bookItemId) {
         UserGeneralTbl general = userGeneralMapper.selectById(generalId);
@@ -238,14 +241,41 @@ public class HallService {
             throw new RuntimeException("道具不足");
         }
         
+        // 1. Map Item -> Skill
+        SkillBookMapTbl map = skillBookMapMapper.selectByItemId(bookItemId);
+        if (map == null) {
+            throw new RuntimeException("该道具不是技能书");
+        }
+        Integer newSkillId = map.getSkillId();
+        
+        // 2. Consume Item
         userInventoryMapper.decreaseItem(userId, bookItemId, 1);
         
-        UserGeneralSkillTbl skill = new UserGeneralSkillTbl();
-        skill.setGeneralId(generalId);
-        skill.setCurrentSkillId(bookItemId); 
-        skill.setUpdatedAt(java.time.LocalDateTime.now());
+        // 3. Update or Insert Skill
+        // Check existing
+        Integer oldSkillId = 0;
+        UserGeneralSkillTbl skill = userGeneralSkillMapper.selectByGeneralId(generalId);
+        if (skill == null) {
+            skill = new UserGeneralSkillTbl();
+            skill.setGeneralId(generalId);
+            skill.setCurrentSkillId(newSkillId);
+            skill.setUpdatedAt(java.time.LocalDateTime.now());
+            userGeneralSkillMapper.insert(skill);
+        } else {
+            oldSkillId = skill.getCurrentSkillId();
+            skill.setCurrentSkillId(newSkillId);
+            skill.setUpdatedAt(java.time.LocalDateTime.now());
+            userGeneralSkillMapper.update(skill);
+        }
         
-        userGeneralSkillMapper.insert(skill);
+        // 4. Log
+        SkillLearnLogTbl log = new SkillLearnLogTbl();
+        log.setUserId(userId);
+        log.setGeneralId(generalId);
+        log.setOldSkillId(oldSkillId);
+        log.setNewSkillId(newSkillId);
+        log.setBookItemId(bookItemId);
+        skillLearnLogMapper.insert(log);
     }
 
     @Transactional(rollbackFor = Exception.class)

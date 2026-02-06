@@ -15,6 +15,7 @@ public class BattleContext {
     
     // Environment
     private Integer turnLimit = 20;
+    private List<String> logs = new ArrayList<>();
     
     // Models
     private SideContext ally;
