@@ -11,4 +11,7 @@ public interface UserGeneralMapper {
     List<UserGeneralTbl> selectByUserId(Long userId);
     // 根据主键查单个武将
     UserGeneralTbl selectById(Long id);
+
+    int update(UserGeneralTbl entity);
 }
+

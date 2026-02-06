@@ -30,10 +30,13 @@ public class TroopService {
         if (tpl == null) {
             throw new RuntimeException("无效的兵种ID: " + req.getTroopId());
         }
+        
+        // 校验 civ 解锁 (可选，根据企划)
+        // if (tpl.getUnlockCivRequired()) { ... }
 
-        // 3. 计算并扣除金币 (修正后的方法名)
-        int totalCost = tpl.getRecruitGoldCost().intValue() * req.getCount();
-        int rows = userMapper.reduceGold(userId, totalCost);
+        // 3. 计算并扣除金币
+        long totalCost = tpl.getRecruitGoldCost() * req.getCount();
+        int rows = userMapper.reduceGold(userId, (int)totalCost); // 注意：UserMapper.reduceGold 参数是 Integer
 
         if (rows == 0) {
             throw new RuntimeException("金币不足，无法招募。需要: " + totalCost);
@@ -42,4 +45,5 @@ public class TroopService {
         // 4. 执行原子增兵 (Upsert)
         userTroopMapper.upsertAdd(userId, req.getTroopId().intValue(), req.getCount().longValue());
     }
+
 }
