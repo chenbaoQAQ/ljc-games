@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ljc.mapper.UserEquipmentMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_equipments (user_id, template_id, enhance_level, socket1_gem_id, socket2_gem_id, is_equipped, is_locked, created_at)
+        VALUES (#{userId}, #{templateId}, #{enhanceLevel}, #{socket1GemId}, #{socket2GemId}, #{isEquipped}, #{isLocked}, NOW())
+    </insert>
+
+    <update id="update">
+        UPDATE user_equipments
+        SET enhance_level = #{enhanceLevel},
+            socket1_gem_id = #{socket1GemId},
+            socket2_gem_id = #{socket2GemId},
+            is_equipped = #{isEquipped},
+            is_locked = #{isLocked}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultType="ljc.entity.UserEquipmentTbl">
+        SELECT * FROM user_equipments WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultType="ljc.entity.UserEquipmentTbl">
+        SELECT * FROM user_equipments WHERE user_id = #{userId}
+    </select>
+
+</mapper>

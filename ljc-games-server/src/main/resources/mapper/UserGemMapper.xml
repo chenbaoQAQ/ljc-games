@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ljc.mapper.UserGemMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_gems (user_id, gem_type, gem_level, stat_value, is_used, created_at)
+        VALUES (#{userId}, #{gemType}, #{gemLevel}, #{statValue}, #{isUsed}, NOW())
+    </insert>
+
+    <update id="update">
+        UPDATE user_gems
+        SET is_used = #{isUsed}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultType="ljc.entity.UserGemTbl">
+        SELECT * FROM user_gems WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultType="ljc.entity.UserGemTbl">
+        SELECT * FROM user_gems WHERE user_id = #{userId} AND is_used = 0
+    </select>
+
+</mapper>
