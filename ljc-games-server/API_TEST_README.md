@@ -1,44 +1,64 @@
 # 接口测试指南 (API Test README)
 
-本通过 `curl` 命令验证 **大厅系统** 与 **战斗框架** 的核心功能。
+本文档提供适配 **Apifox** 的接口测试用例。你可以直接复制下方的 `curl` 命令并在 Apifox 中选择 "导入 cURL" 即可快速生成接口。
 
-> **前置条件**：
-> 1. 启动服务器 (`LjcGamesServerApplication`)
-> 2. 数据库已初始化 (`schema.sql` 和 `data.sql` 已执行)
-> 3. 确保存在测试用户 (userId=1) 和基础数据 (武将、装备、物品)
+> **环境依赖**:
+> 1. 服务器已启动 (`LjcGamesServerApplication`)。
+> 2. `data.sql` 已包含基础数据 (启动后自动加载)。
+> 3. 默认主机: `http://localhost:8080` (在 Apifox 中建议配置为环境变量 `{{baseUrl}}`)。
+
+---
+
+## 0. 账号体系 (Auth)
+
+该系统现已预置测试账号 (`userId=1`)。如需创建新号，请使用注册接口。
+
+### 注册新账号
+*如果需要测试多用户流程，可先注册新号*
+```bash
+curl -X POST "http://localhost:8080/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "测试数据",
+    "password": "123",
+    "nickname": "李俊辰",
+    "initialCiv": "CN"
+  }'
+```
 
 ---
 
 ## 1. 大厅系统 (Hall System)
 
+**测试前置**: 使用预置账号 `userId=1`，已拥有初始武将(ID=1001)、装备(ID=1)和金币。
+
 ### 1.1 武将管理
 
 #### 激活武将 (Activate)
-*消耗金币激活新武将*
+*消耗金币激活已解锁的武将 (测试用ID: 2)*
 ```bash
-curl -X POST "http://localhost:8080/hall/general/activate?userId=1&generalId=1"
+curl -X POST "http://localhost:8080/hall/general/activate?userId=1&generalId=2"
 ```
 
 #### 升级武将 (Upgrade)
-*消耗金币提升武将等级 (Level +1, HP +50)*
+*消耗金币提升等级，每次调用升1级*
 ```bash
 curl -X POST "http://localhost:8080/hall/general/upgrade?userId=1&generalId=1"
 ```
 
 #### 穿戴装备 (Equip)
-*将装备 (equipmentId=1) 穿戴到武将 (generalId=1) 的武器槽位 (weapon)*
+*将"铁剑" (ID=1) 穿戴到"新手主公"的武器槽*
 ```bash
 curl -X POST "http://localhost:8080/hall/general/equip?userId=1" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "generalId": 1,
-           "equipmentId": 1,
-           "slot": "weapon"
-         }'
+  -H "Content-Type: application/json" \
+  -d '{
+    "generalId": 1,
+    "equipmentId": 1
+  }'
 ```
 
 #### 学习技能 (Learn Skill)
-*消耗技能书 (itemId=301) 给武将学习技能*
+*消耗背包中的技能书 (ItemID=301) 学习技能*
 ```bash
 curl -X POST "http://localhost:8080/hall/skill/learn?userId=1&generalId=1&bookItemId=301"
 ```
@@ -46,74 +66,60 @@ curl -X POST "http://localhost:8080/hall/skill/learn?userId=1&generalId=1&bookIt
 ### 1.2 装备与宝石
 
 #### 强化装备 (Enhance)
-*消耗金币强化装备 (Level +1)*
+*消耗金币强化装备等级*
 ```bash
 curl -X POST "http://localhost:8080/hall/equipment/enhance?userId=1&equipmentId=1"
 ```
 
-#### 宝石镶嵌 (Gem Inlay)
-*将宝石 (gemId=101) 镶嵌到装备 (equipmentId=1) 的第1个孔位*
+#### 宝石镶嵌 (Inlay)
+*将攻击宝石 (ID=1) 镶嵌到装备的第1个孔位*
 ```bash
 curl -X POST "http://localhost:8080/hall/gem/inlay?userId=1" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "equipmentId": 1,
-           "socketIndex": 1,
-           "gemId": 101
-         }'
-```
-
-### 1.3 兵营 (Troops)
-
-#### 招募士兵 (Recruit)
-*消耗金币招募兵种 (troopId=1) 100个*
-```bash
-curl -X POST "http://localhost:8080/hall/recruit?userId=1" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "troopId": 1,
-           "count": 100
-         }'
+  -H "Content-Type: application/json" \
+  -d '{
+    "equipmentId": 1,
+    "socketIndex": 1,
+    "gemId": 1
+  }'
 ```
 
 ---
 
-## 2. 战斗框架 (Battle Framework)
+## 2. 战斗框架 (Battle)
 
-### 2.1 开始战斗 (Start Battle)
-*携带 10个兵种1 和 5个兵种2 出战*
-* **注意**: 此接口会创建 `battle_sessions` 记录，并锁定兵力。
+### 开始战斗 (Start)
+*创建一场新战斗会话*
 ```bash
 curl -X POST "http://localhost:8080/battle/start?userId=1" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "generalId": 1,
-           "stageId": 101,
-           "troopConfig": {
-             "1": 10,
-             "2": 5
-           }
-         }'
+  -H "Content-Type: application/json" \
+  -d '{
+    "generalId": 1,
+    "stageId": 101,
+    "troopConfig": {
+      "1001": 10
+    }
+  }'
 ```
-> **返回结果**: 成功将返回 `sessionId` (例如 `1700000000123`)。请记下此 ID 用于后续交互。
+> **注意**: 响应中的 `sessionId` 需要记录下来，用于后续的回合推进接口。
 
-### 2.2 回合推进 (Battle Action)
-*推进到下一回合 (模拟)*
+### 回合行动 (Action)
+*推进到下一回合 (示例中使用 SKIP 跳过)*
 ```bash
-# 请替换 <SESSION_ID> 为上面接口返回的 ID
+# 请将 <SESSION_ID> 替换为 开始战斗 接口返回的值
 curl -X POST "http://localhost:8080/battle/action?userId=1" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "sessionId": "<SESSION_ID>",
-           "actionType": "SKIP"
-         }'
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "<SESSION_ID>",
+    "actionType": "SKIP"
+  }'
 ```
 
 ---
 
-## 3. 常见问题排查
+## 常见问题 (FAQ)
 
-- **金币不足**: 请手动修改数据库给用户加钱: `UPDATE users SET gold = 999999 WHERE id = 1;`
-- **武将不存在**: 检查 `user_generals` 表是否有数据。
-- **装备不存在**: 检查 `user_equipments` 表。
-- **兵力不足**: 先调用招募接口或手动修改 `user_troops`。
+1. **报错 "武将不存在"**: 请确认是否重启了服务器以加载新的 `data.sql`。
+2. **Apifox 使用技巧**:
+   - 复制上方的代码块。
+   - 在 Apifox 左上角点击 **+** -> **导入 cURL**。
+   - 粘贴代码即可自动解析 Body 和 Params。

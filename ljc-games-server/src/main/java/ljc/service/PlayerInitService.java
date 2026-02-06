@@ -76,6 +76,11 @@ public class PlayerInitService {
         general.setTier(0);
         // 休息回合默认为 0
         general.setRestTurns(0);
+        
+        // Initialize equipment slots - No longer needed after refactor
+        // general.setEquipWeaponId(0L); ... removed
+
+
         // D. 插入武将: userGeneralMapper.insert(general);
         userGeneralMapper.insert(general);
 

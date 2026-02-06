@@ -1,68 +1,69 @@
-# 实现计划：大厅系统与战斗框架 (v2.3)
+# 进度对齐：大厅系统 (v2.3)
 
-> 严格遵照《游戏企划书 v2.3》| 不做 SLG | 不做世界地图
+> 根据 `企划.md`，暂不包含战斗模块的完整实现。以下是当前已完成功能与待办事项的盘点。
 
-## 1. 大厅系统 (Hall System)
+## 1. 已完成 (Done)
 
-大厅是玩家进行资源管理和养成的地方。
+### 1.1 基础架构
+- [x] **数据库 Schema v2.3**: 完整实现了用户、武将、装备、宝石、战斗会话等核心表结构。(已修复 `created_at` 重复报错)
+- [x] **Entity/Mapper 层**: 对应所有表的 Java 实体与 MyBatis 映射文件。
+- [x] **用户注册/登录 (Auth)**: 
+    - 实现了基于 JWT (或基础 Session) 的注册流程。
+    - 修复了注册时的数据库字段约束错误 (`equip_weapon_id` null 问题)。
+    - 完成了 `PlayerInitService`，支持新用户自动发放：四国进度、初始武将、初始兵力。
 
-### 1.1 核心功能点
+### 1.2 大厅功能 (Hall Service)
+- [x] **武将系统**:
+    - **激活**: 消耗金币激活已解锁武将 (逻辑已修复，支持重复校验)。
+    - **升级**: 消耗金币提升等级，包含基础属性 (HP) 成长。
+- [x] **装备系统 (重构优化版)**:
+    - **穿戴**: 
+        - 实现了 `UserEquipment` -> `UserGeneral` 的关联逻辑 (通过 `general_id` 字段)。
+        - **API 优化**: 接口不再需要传 `slot`，后端自动通过 `EquipmentTemplate` 推断槽位。
+    - **强化**: 消耗金币提升装备 `enhance_level`。
+- [x] **宝石系统**:
+    - **镶嵌**: 将宝石镶嵌到装备的指定孔位 (Socket 1/2)。
+    - (*注: 合成接口已定义但逻辑暂为 Stub*)
+- [x] **技能系统**:
+    - **学习**: 消耗技能书覆盖武将当前技能。
 
-| 模块 | 功能 | 逻辑简述 | 涉及表 (Schema v2.3) |
-| :--- | :--- | :--- | :--- |
-| **四国进度** | 解锁国家 | 检查前置条件(如上一国通关)，更新 `user_civ_progress` | `user_civ_progress` |
-| **兵营** | 招兵 | 消耗 Gold -> 增加 `user_troops` 数量 | `user_troops`, `currency_ledger` |
-| **武将** | 解锁 | 剧情/条件满足 -> `user_generals.unlocked = 1` | `user_generals` |
-| | 激活 | 消耗 Gold/Diamond -> `user_generals.activated = 1` | `user_generals` |
-| | 升级 | 消耗 Gold -> `level++`, 属性提升 | `user_generals` |
-| | 升阶 | 消耗材料/爬塔资格 -> `tier++`, 等级上限提升 | `user_generals` |
-| **装备** | 强化 | 消耗 Gold -> `simulate success rate` -> `enhance_level++` (Max +8) | `user_equipments` |
-| | 穿戴 | 检查槽位 `slot` -> 更新 `user_generals` 的 `equip_*_id` | `user_equipments`, `user_generals` |
-| **宝石** | 镶嵌 | 检查孔位 -> `user_equipments.socket*_gem_id` | `user_equipments`, `user_gems` |
-| | 合成 | 5合1 -> `count -= 5`, `next_level_count += 1` | `user_gems` |
-| **技能** | 学习 | 消耗技能书 -> 覆盖 `user_general_skill` | `user_general_skill`, `skill_learn_log` |
-
-### 1.2 接口设计 (API Draft)
-
--   `POST /hall/recruit` (troopId, count)
--   `POST /general/upgrade` (generalId)
--   `POST /general/equip` (generalId, equipmentId, slot)
--   `POST /equipment/enhance` (equipmentId)
--   `POST /gem/combine` (gemType, level)
--   `POST /gem/inlay` (equipmentId, socketIndex, gemId)
+### 1.3 测试与联调
+- [x] **API 文档**: `API_TEST_README.md` 已全面更新，支持 Apifox 一键导入 cURL (已同步去除 slot 参数)。
+- [x] **测试数据**: `data.sql` 预置了：
+    - 性格、兵种、武将模板 (1001/1002)、装备模板 (铁剑/皮甲)、宝石模板。
+    - 技能书与技能 (ID 1 鼓舞)。
+    - 初始测试用户 `admin` (ID 1) 拥有完整测试资源。
+- [x] **Bug 修复**:
+    - 解决了初始数据导致的“武将已激活”错误。
+    - 解决了数据库字段非空约束导致的 500 错误。
+    - 解决了 HallService 的编译错误 (缺失 Import / 重复注解)。
 
 ---
 
-## 2. 战斗框架 (Battle Framework)
+## 2. 待办事项 (Pending - Hall Service Scope)
 
-仅实现会话管理与流程推进，**不仅算胜负细节**，专注交互结构。
+在进入战斗模块开发前，大厅系统仍需完善以下细节：
 
-### 2.1 核心逻辑 (v2.3)
+### 2.1 缺失的大厅功能
+- [ ] **兵营 (Recruit)**:
+    - 目前 `user_troops` 表已存在，但 **招兵接口 (`recruit`) 尚未实现**。
+    - 需实现：扣除金币 -> 增加对应 Troop ID 的数量。
+- [ ] **宝石合成 (Combine)**:
+    - 接口存在，但逻辑未完全实现 (目前仅为伪代码注释)。
+    - 需实现：检查 5 个同类同级宝石 -> 删除 -> 生成 1 个高一级宝石。
+- [ ] **武将升阶 (Ascend)**:
+    - 目前仅实现了 `upgrade` (升级)，未实现 `ascend` (升阶)。
+    - 需实现：检查 Tier 上限条件 -> 消耗材料 -> 提升 Tier。
 
-1.  **无坐标/无行军**：点击即战斗。
-2.  **会话制**：
-    -   战斗开始 -> 生成 `session_id`。
-    -   战斗中 -> 仅通过 `session_id` 交互。
-    -   支持 **Civ + Stage** (主线) 或 **TowerFloor** (爬塔)。
+### 2.2 逻辑完善
+- [ ] **数值配置化**:
+    - 当前升级/强化消耗公式写死在代码中 (`level * 100`)。
+    - 需改为：读取 `general_template` 或全局配置表。
+- [ ] **防作弊校验**:
+    - 增加资源扣除的前置校验（如金币是否为负数等边界情况）。
 
-### 2.2 数据库 (Schema v2.3 复用)
+---
 
-直接使用 `schema.sql` 中已存在的表，不做冗余设计。
+## 3. 下一步建议
 
--   **`battle_sessions`** (注意是复数): 存储运行时状态 `context_json`。
--   **`battle_log`**: 存储回合日志。
-
-### 2.3 接口设计 (API Draft)
-
--   `POST /battle/start`
-    -   Input: `generalId`, `civ`, `stageNo` (or `towerFloor`), `troopConfig`
-    -   Output: `sessionId`, `turn: 0`
--   `POST /battle/action`
-    -   Input: `sessionId`, `actionType` (Skill/Skip)
-    -   Output: `turn: N+1`, `logs: [...]`
-
-## 3. 下一步计划
-
-1.  **用户确认**：确认本计划符合 v2.3 要求。
-2.  **大厅开发**：优先完成兵营、武将、装备逻辑。
-3.  **战斗连接**：实现 `start` 和 `action` 的基础空转逻辑（Log only）。
+建议优先完成 **[2.1 缺失的大厅功能]** 中的 **招兵** 和 **宝石合成**，确保养成闭环完整，再开始 **战斗模块 (Battle Session)** 的开发。

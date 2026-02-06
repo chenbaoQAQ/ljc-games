@@ -11,7 +11,8 @@ public class UserEquipmentTbl {
     private Integer enhanceLevel;
     private Long socket1GemId;
     private Long socket2GemId;
-    private Boolean isEquipped;
+    private Long generalId;
+    private String slot;
     private Boolean isLocked;
     private LocalDateTime createdAt;
 }

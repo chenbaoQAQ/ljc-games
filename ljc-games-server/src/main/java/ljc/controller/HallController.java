@@ -21,7 +21,7 @@ public class HallController {
 
     @PostMapping("/general/equip")
     public Result<String> equipGeneral(@RequestParam Long userId, @RequestBody EquipReq req) {
-        hallService.equip(userId, req.getGeneralId(), req.getEquipmentId(), req.getSlot());
+        hallService.equip(userId, req.getGeneralId(), req.getEquipmentId());
         return Result.success("装备成功");
     }
 
@@ -29,7 +29,6 @@ public class HallController {
     public static class EquipReq {
         private Long generalId;
         private Long equipmentId;
-        private String slot; // weapon, armor1, etc.
     }
 
     @PostMapping("/gem/inlay")

@@ -120,14 +120,6 @@ CREATE TABLE user_generals (
   rest_turns INT NOT NULL DEFAULT 0, -- 战后休息回合数，>0 不可出战
   capacity INT NOT NULL DEFAULT 0,   -- 统帅上限（空间）
 
-  -- 6装备槽：0=空
-  equip_weapon_id BIGINT NOT NULL DEFAULT 0,
-  equip_armor1_id BIGINT NOT NULL DEFAULT 0,
-  equip_armor2_id BIGINT NOT NULL DEFAULT 0,
-  equip_shoes_id BIGINT NOT NULL DEFAULT 0,
-  equip_flag_id BIGINT NOT NULL DEFAULT 0,
-  equip_talisman_id BIGINT NOT NULL DEFAULT 0,
-
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   INDEX idx_ug_user (user_id),
@@ -144,7 +136,9 @@ CREATE TABLE user_equipments (
   socket1_gem_id BIGINT NOT NULL DEFAULT 0,
   socket2_gem_id BIGINT NOT NULL DEFAULT 0,
 
-  is_equipped BOOLEAN NOT NULL DEFAULT FALSE,
+  general_id BIGINT DEFAULT NULL,         -- 穿戴在哪个武将身上 (NULL=未穿戴)
+  slot VARCHAR(12) DEFAULT NULL,          -- 穿戴在哪个槽位 (NULL=未穿戴)
+
   is_locked BOOLEAN NOT NULL DEFAULT FALSE,
 
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

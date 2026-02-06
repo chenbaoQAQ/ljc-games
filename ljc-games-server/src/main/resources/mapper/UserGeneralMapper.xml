@@ -3,11 +3,9 @@
 <mapper namespace="ljc.mapper.UserGeneralMapper">
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO user_generals
-        (user_id, template_id, unlocked, activated, level, tier, current_hp, max_hp, rest_turns, capacity,
-         equip_weapon_id, equip_armor1_id, equip_armor2_id, equip_shoes_id, equip_flag_id, equip_talisman_id, created_at)
+         (user_id, template_id, unlocked, activated, level, tier, current_hp, max_hp, rest_turns, capacity, created_at)
         VALUES
-            (#{userId}, #{templateId}, #{unlocked}, #{activated}, #{level}, #{tier}, #{currentHp}, #{maxHp}, #{restTurns}, #{capacity},
-             #{equipWeaponId}, #{equipArmor1Id}, #{equipArmor2Id}, #{equipShoesId}, #{equipFlagId}, #{equipTalismanId}, NOW())
+            (#{userId}, #{templateId}, #{unlocked}, #{activated}, #{level}, #{tier}, #{currentHp}, #{maxHp}, #{restTurns}, #{capacity}, NOW())
     </insert>
 
     <update id="update">
@@ -19,13 +17,7 @@
             current_hp = #{currentHp},
             max_hp = #{maxHp},
             rest_turns = #{restTurns},
-            capacity = #{capacity},
-            equip_weapon_id = #{equipWeaponId},
-            equip_armor1_id = #{equipArmor1Id},
-            equip_armor2_id = #{equipArmor2Id},
-            equip_shoes_id = #{equipShoesId},
-            equip_flag_id = #{equipFlagId},
-            equip_talisman_id = #{equipTalismanId}
+            capacity = #{capacity}
         WHERE id = #{id}
     </update>
 

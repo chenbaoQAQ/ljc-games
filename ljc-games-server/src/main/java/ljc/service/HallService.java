@@ -2,6 +2,8 @@ package ljc.service;
 
 import ljc.entity.*;
 import ljc.mapper.*;
+import ljc.entity.EquipmentTemplateTbl;
+import ljc.mapper.EquipmentTemplateMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,7 @@ public class HallService {
     private final UserCivProgressMapper userCivProgressMapper;
     private final UserInventoryMapper userInventoryMapper;
     private final UserGeneralSkillMapper userGeneralSkillMapper;
+    private final EquipmentTemplateMapper equipmentTemplateMapper;
 
     
     // 省略其他Mapper注入
@@ -53,7 +56,7 @@ public class HallService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void equip(Long userId, Long generalId, Long equipmentId, String slot) {
+    public void equip(Long userId, Long generalId, Long equipmentId) {
         // 1. 校验武将
         UserGeneralTbl general = userGeneralMapper.selectById(generalId);
         if (general == null || !general.getUserId().equals(userId)) {
@@ -65,40 +68,40 @@ public class HallService {
         if (equip == null || !equip.getUserId().equals(userId)) {
             throw new RuntimeException("装备不存在");
         }
-        if (equip.getIsEquipped()) {
-           throw new RuntimeException("装备已被其他武将穿戴"); 
-           // 实际项目可能支持“抢过来”，这里简化
+        
+        // 3. 获取装备模板以推断 Slot
+        EquipmentTemplateTbl tpl = equipmentTemplateMapper.selectById(equip.getTemplateId());
+        if (tpl == null) {
+            throw new RuntimeException("装备模板不存在");
         }
-        
-        // 校验槽位类型 (略：假设前端传的 slot 正确，或者通过 templateId 查 EquipmentTemplate 校验)
-        // 假设 slot 是 "weapon", "armor1" 等
-        
-        // 3. 处理卸下旧装备 (如果有)
-        Long oldEquipId = 0L;
-        switch (slot) {
-            case "weapon": oldEquipId = general.getEquipWeaponId(); general.setEquipWeaponId(equipmentId); break;
-            case "armor1": oldEquipId = general.getEquipArmor1Id(); general.setEquipArmor1Id(equipmentId); break;
-            case "armor2": oldEquipId = general.getEquipArmor2Id(); general.setEquipArmor2Id(equipmentId); break;
-            case "shoes": oldEquipId = general.getEquipShoesId(); general.setEquipShoesId(equipmentId); break;
-            case "flag": oldEquipId = general.getEquipFlagId(); general.setEquipFlagId(equipmentId); break;
-            case "talisman": oldEquipId = general.getEquipTalismanId(); general.setEquipTalismanId(equipmentId); break;
-            default: throw new RuntimeException("无效的装备槽位: " + slot);
+        String slot = tpl.getSlot();
+        if (slot == null || slot.isEmpty()) {
+            throw new RuntimeException("装备模板未配置槽位");
         }
+
+        // 如果此装备已被别人穿戴，且不是自己
+        if (equip.getGeneralId() != null && !equip.getGeneralId().equals(generalId)) {
+             throw new RuntimeException("装备已被其他武将穿戴"); 
+        }
+
+        // 4. 卸下该武将该槽位上的旧装备 (如果有)
+        // 临时方案：遍历用户所有装备 
+        java.util.List<UserEquipmentTbl> allEquips = userEquipmentMapper.selectByUserId(userId);
         
-        if (oldEquipId != null && oldEquipId > 0) {
-            UserEquipmentTbl oldEquip = userEquipmentMapper.selectById(oldEquipId);
-            if (oldEquip != null) {
-                oldEquip.setIsEquipped(false);
-                userEquipmentMapper.update(oldEquip);
+        for (UserEquipmentTbl e : allEquips) {
+            // 注意：这里需要再次查模板才能确认 e 的 slot，或者直接用 e.getSlot() (如果我们在 UserEquipment 存了 slot)
+            // UserEquipment 表存了 slot 字段，这很有用！
+            if (generalId.equals(e.getGeneralId()) && slot.equals(e.getSlot())) {
+                e.setGeneralId(null);
+                e.setSlot(null);
+                userEquipmentMapper.update(e);
             }
         }
         
-        // 4. 更新新装备状态
-        equip.setIsEquipped(true);
+        // 5. 更新当前装备
+        equip.setGeneralId(generalId);
+        equip.setSlot(slot);
         userEquipmentMapper.update(equip);
-        
-        // 5. 更新武将
-        userGeneralMapper.update(general);
     }
 
     @Transactional(rollbackFor = Exception.class)

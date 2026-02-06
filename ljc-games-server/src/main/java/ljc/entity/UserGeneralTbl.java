@@ -17,12 +17,7 @@ public class UserGeneralTbl {
     private Integer restTurns;
     private Integer capacity;
     
-    private Long equipWeaponId;
-    private Long equipArmor1Id;
-    private Long equipArmor2Id;
-    private Long equipShoesId;
-    private Long equipFlagId;
-    private Long equipTalismanId;
+
 
     private LocalDateTime createdAt;
 }

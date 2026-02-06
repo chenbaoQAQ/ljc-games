@@ -3,8 +3,8 @@
 <mapper namespace="ljc.mapper.UserEquipmentMapper">
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user_equipments (user_id, template_id, enhance_level, socket1_gem_id, socket2_gem_id, is_equipped, is_locked, created_at)
-        VALUES (#{userId}, #{templateId}, #{enhanceLevel}, #{socket1GemId}, #{socket2GemId}, #{isEquipped}, #{isLocked}, NOW())
+        INSERT INTO user_equipments (user_id, template_id, enhance_level, socket1_gem_id, socket2_gem_id, general_id, slot, is_locked, created_at)
+        VALUES (#{userId}, #{templateId}, #{enhanceLevel}, #{socket1GemId}, #{socket2GemId}, #{generalId}, #{slot}, #{isLocked}, NOW())
     </insert>
 
     <update id="update">
@@ -12,7 +12,8 @@
         SET enhance_level = #{enhanceLevel},
             socket1_gem_id = #{socket1GemId},
             socket2_gem_id = #{socket2GemId},
-            is_equipped = #{isEquipped},
+            general_id = #{generalId},
+            slot = #{slot},
             is_locked = #{isLocked}
         WHERE id = #{id}
     </update>
