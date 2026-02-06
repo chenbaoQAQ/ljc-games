@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS battle_sessions (
+DROP TABLE IF EXISTS battle_sessions;
+
+CREATE TABLE battle_sessions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     battle_id BIGINT,
@@ -7,9 +9,7 @@ CREATE TABLE IF NOT EXISTS battle_sessions (
     current_turn INT DEFAULT 1,
     context_json LONGTEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_user_status (user_id, status) -- Ensure only one active session per user roughly? No, Status changes. better unique key on user_id if we hard limit.
-    -- For now, let's just index user_id and handle logic in app.
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_battle_user ON battle_sessions(user_id);
