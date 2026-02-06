@@ -17,6 +17,7 @@ public class HallService {
     private final UserGemMapper userGemMapper;
     private final UserCivProgressMapper userCivProgressMapper;
     private final UserInventoryMapper userInventoryMapper;
+    private final UserGeneralSkillMapper userGeneralSkillMapper;
 
     
     // 省略其他Mapper注入
@@ -142,5 +143,63 @@ public class HallService {
         // update gem status
         gem.setIsUsed(true);
         userGemMapper.update(gem);
+    }
+    @Transactional(rollbackFor = Exception.class)
+    public void activateGeneral(Long userId, Long generalId) {
+        UserGeneralTbl general = userGeneralMapper.selectById(generalId);
+        if (general == null || !general.getUserId().equals(userId)) {
+            throw new RuntimeException("武将不存在");
+        }
+        if (Boolean.TRUE.equals(general.getActivated())) {
+            throw new RuntimeException("武将已激活");
+        }
+        // check if unlocked
+        if (Boolean.FALSE.equals(general.getUnlocked())) {
+            throw new RuntimeException("武将未解锁");
+        }
+        general.setActivated(true);
+        userGeneralMapper.update(general);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void enhanceEquipment(Long userId, Long equipmentId) {
+        UserEquipmentTbl equip = userEquipmentMapper.selectById(equipmentId);
+        if (equip == null || !equip.getUserId().equals(userId)) {
+            throw new RuntimeException("装备不存在");
+        }
+        
+        // Simple cost: (level+1)*100
+        int currentLevel = (equip.getEnhanceLevel() == null) ? 0 : equip.getEnhanceLevel();
+        int cost = (currentLevel + 1) * 100;
+        
+        int rows = userMapper.reduceGold(userId, cost);
+        if (rows == 0) {
+            throw new RuntimeException("金币不足");
+        }
+
+        equip.setEnhanceLevel(currentLevel + 1);
+        userEquipmentMapper.update(equip);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void learnSkill(Long userId, Long generalId, Integer bookItemId) {
+        UserGeneralTbl general = userGeneralMapper.selectById(generalId);
+        if (general == null || !general.getUserId().equals(userId)) {
+             throw new RuntimeException("武将不存在");
+        }
+        
+        Integer count = userInventoryMapper.selectCount(userId, bookItemId);
+        if (count == null || count < 1) {
+            throw new RuntimeException("道具不足");
+        }
+        
+        userInventoryMapper.decreaseItem(userId, bookItemId, 1);
+        
+        UserGeneralSkillTbl skill = new UserGeneralSkillTbl();
+        skill.setGeneralId(generalId);
+        skill.setCurrentSkillId(bookItemId); 
+        skill.setUpdatedAt(java.time.LocalDateTime.now());
+        
+        userGeneralSkillMapper.insert(skill);
     }
 }

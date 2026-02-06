@@ -55,7 +55,8 @@ public class HallController {
     public Result<String> enhanceEquipment(@RequestParam Long userId, @RequestParam Long equipmentId) {
         hallService.enhanceEquipment(userId, equipmentId);
         return Result.success("强化成功");
-    
+    }
+
 
 
     @PostMapping("/skill/learn")
