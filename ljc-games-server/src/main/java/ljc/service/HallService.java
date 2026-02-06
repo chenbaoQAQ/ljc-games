@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -360,7 +361,10 @@ public class HallService {
         // So formula: newStat = currentStat + (level * 10);
         
         // 3. Delete old gems
-        List<Long> ids = gems.stream().map(UserGemTbl::getId).collect(java.util.stream.Collectors.toList());
+        List<Long> ids = new ArrayList<>();
+        for (UserGemTbl g : gems) {
+            ids.add(g.getId());
+        }
         userGemMapper.deleteBatch(ids);
 
         // 4. Insert new gem

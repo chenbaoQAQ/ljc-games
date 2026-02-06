@@ -22,4 +22,9 @@ public interface UserMapper {
      * 安全扣钱：确保金币不为负数
      */
     int reduceGold(@Param("userId") Long userId, @Param("cost") Integer cost);
+
+    /**
+     * 安全扣体力
+     */
+    int reduceStamina(@Param("userId") Long userId, @Param("cost") Integer cost);
 }

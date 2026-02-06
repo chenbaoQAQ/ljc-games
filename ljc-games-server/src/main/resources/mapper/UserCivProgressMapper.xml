@@ -5,4 +5,14 @@
         INSERT INTO user_civ_progress (user_id, civ, unlocked, max_stage_cleared)
         VALUES (#{userId}, #{civ}, #{unlocked}, #{maxStageCleared})
     </insert>
+    <select id="selectByUserIdAndCiv" resultType="ljc.entity.UserCivProgressTbl">
+        SELECT * FROM user_civ_progress WHERE user_id = #{userId} AND civ = #{civ}
+    </select>
+    
+    <update id="update">
+        UPDATE user_civ_progress
+        SET unlocked = #{unlocked},
+            max_stage_cleared = #{maxStageCleared}
+        WHERE user_id = #{userId} AND civ = #{civ}
+    </update>
 </mapper>

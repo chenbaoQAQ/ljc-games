@@ -22,6 +22,12 @@
         WHERE id = #{userId} AND gold >= #{cost}
     </update>
 
+    <update id="reduceStamina">
+        UPDATE users
+        SET stamina = stamina - #{cost}
+        WHERE id = #{userId} AND stamina >= #{cost}
+    </update>
+
     <select id="selectByUsername" resultType="ljc.entity.UserTbl">
         SELECT * FROM users WHERE username = #{username}
     </select>

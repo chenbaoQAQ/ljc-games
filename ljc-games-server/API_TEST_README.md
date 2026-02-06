@@ -141,6 +141,43 @@ curl -X POST "http://localhost:8080/battle/turn?userId=1" \
 
 ---
 
+---
+
+## 3. 剧情模式 (Story Mode MVP)
+
+> **前置要求**:
+> 1. 执行 SQL 脚本: `src/main/resources/schema_update_story.sql` (初始化关卡配置)
+> 2. 确保 `schema_update_battle.sql` 也已执行。
+
+### 3.1 查询关卡信息
+*查看第1关的 enemy_config 和体力消耗*
+```bash
+curl -X GET "http://localhost:8080/stage/story/CN/1"
+```
+
+### 3.2 开启剧情战斗
+*扣除体力与兵力，进入战斗*
+```bash
+curl -X POST "http://localhost:8080/battle/story/start?userId=1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "civ": "CN",
+    "stageNo": 1,
+    "generalId": 1,
+    "troopConfig": {
+        "1001": 10
+    }
+  }'
+```
+
+### 3.3 推进回合 (同上)
+使用 `POST /battle/turn` 接口。当 `ctx.status != 0` 时，表示战斗结束（胜利/失败）。
+胜利后，系统会自动：
+1. 返还幸存士兵。
+2. 更新最大通关进度。
+
+---
+
 ## 常见问题 (FAQ)
 
 1. **报错 "武将不存在"**: 请确认是否重启了服务器以加载新的 `data.sql`。
