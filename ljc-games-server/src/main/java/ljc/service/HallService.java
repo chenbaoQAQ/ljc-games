@@ -17,8 +17,7 @@ public class HallService {
     private final UserGemMapper userGemMapper;
     private final UserCivProgressMapper userCivProgressMapper;
     private final UserInventoryMapper userInventoryMapper;
-    private final UserCivProgressMapper userCivProgressMapper;
-    private final UserInventoryMapper userInventoryMapper;
+
     
     // 省略其他Mapper注入
 
