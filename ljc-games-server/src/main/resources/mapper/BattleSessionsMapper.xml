@@ -3,9 +3,10 @@
 <mapper namespace="ljc.mapper.BattleSessionMapper">
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO battle_sessions (user_id, battle_id, civ, dungeon_id, status, current_turn, context_json, created_at, updated_at)
-        VALUES (#{userId}, #{battleId}, #{civ}, #{dungeonId}, #{status}, #{currentTurn}, #{contextJson}, NOW(), NOW())
+        INSERT INTO battle_sessions (user_id, battle_id, civ, stage_no, status, current_turn, context_json, created_at, updated_at)
+        VALUES (#{userId}, #{battleId}, #{civ}, #{stageNo}, #{status}, #{currentTurn}, #{contextJson}, NOW(), NOW())
     </insert>
+
 
 
     <update id="update">

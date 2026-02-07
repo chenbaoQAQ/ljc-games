@@ -178,33 +178,23 @@ CREATE TABLE user_inventory (
 
 -- 进行中会话：一个玩家同一时刻只允许 1 场进行中的战斗（符合你的游戏）
 CREATE TABLE battle_sessions (
-  user_id BIGINT PRIMARY KEY,
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
 
-  battle_id BIGINT NOT NULL,                -- 本场战斗唯一标识（可用雪花/自增/时间戳）
-  status VARCHAR(12) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE / FINISHED / ABORTED
+  battle_id BIGINT NOT NULL,                -- 本场战斗唯一标识
+  civ VARCHAR(10) DEFAULT 'CN',
+  stage_no INT NOT NULL,
 
-  mode VARCHAR(10) NOT NULL,                -- STORY / TOWER
-  civ VARCHAR(10) DEFAULT NULL,
-  stage_no INT DEFAULT NULL,
-  tower_floor INT DEFAULT NULL,
-
-  general_id BIGINT NOT NULL,
-  seed BIGINT NOT NULL,
-
-  current_turn INT NOT NULL DEFAULT 1,      -- 当前回合（从1开始）
-  max_turn INT NOT NULL DEFAULT 20,         -- 最大回合（默认20，可配）
-
-  -- 不可变上下文：配兵、关卡、初始属性快照等
+  status INT NOT NULL DEFAULT 0,            -- 0:进行中, 1:胜利, 2:失败
+  current_turn INT NOT NULL DEFAULT 1,
   context_json JSON NOT NULL,
-  -- 可变状态：当前HP、撤退标记、技能CD、兵存活等
-  state_json JSON NOT NULL,
 
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-  INDEX idx_bs_status (status),
-  INDEX idx_bs_battle (battle_id)
+  INDEX idx_bs_user_status (user_id, status)
 ) ENGINE=InnoDB;
+
 
 -- 可选：如果你希望未来复盘每回合事件（本期不强制实现）
 CREATE TABLE battle_turn_log (

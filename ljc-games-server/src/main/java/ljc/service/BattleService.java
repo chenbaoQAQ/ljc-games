@@ -39,7 +39,11 @@ public class BattleService {
 
         // 3. User & Progress Validation
         UserCivProgressTbl progress = userCivProgressMapper.selectByUserIdAndCiv(userId, civ);
-        int currentMax = (progress == null) ? 0 : (progress.getMaxStageCleared() == null ? 0 : progress.getMaxStageCleared());
+        if (progress == null || !Boolean.TRUE.equals(progress.getUnlocked())) {
+             throw new RuntimeException("Civilization not unlocked: " + civ);
+        }
+
+        int currentMax = (progress.getMaxStageCleared() == null ? 0 : progress.getMaxStageCleared());
         if (stageNo > currentMax + 1) {
             throw new RuntimeException("Stage locked! Please clear previous stages first.");
         }
@@ -174,7 +178,7 @@ public class BattleService {
         session.setUserId(userId);
         session.setBattleId(ctx.getBattleId());
         session.setCiv(civ); // Set Civ
-        session.setDungeonId(stageNo);
+        session.setStageNo(stageNo);
         session.setStatus(0);
         session.setCurrentTurn(1);
         try {
@@ -302,7 +306,7 @@ public class BattleService {
         BattleSessionTbl session = new BattleSessionTbl();
         session.setUserId(userId);
         session.setBattleId(ctx.getBattleId());
-        session.setDungeonId(dungeonId);
+        session.setStageNo(dungeonId);
         session.setStatus(0); // Ongoing
         session.setCurrentTurn(1);
         try {
@@ -730,75 +734,32 @@ public class BattleService {
             try {
                 ctx = objectMapper.readValue(session.getContextJson(), BattleContext.class);
 
-                // Return Surviving Troops
+                // 1. Return Surviving Troops
                 for (BattleContext.TroopStack s : ctx.getAlly().getTroops()) {
                     if (s.getCount() > 0) {
                         userTroopMapper.upsertAdd(session.getUserId(), s.getTroopId(), s.getCount());
                     }
                 }
 
-                // Update Progress 
-                // Update Progress 
-                String civ = session.getCiv(); 
-                if (civ == null) civ = "CN"; 
-                Integer stageNo = session.getDungeonId();
-                UserCivProgressTbl progress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), civ);
-                if (progress == null) {
-                    progress = new UserCivProgressTbl();
-                    progress.setUserId(session.getUserId());
-                    progress.setCiv(civ);
-                    progress.setMaxStageCleared(stageNo);
-                    progress.setUnlocked(true);
-                    userCivProgressMapper.insert(progress);
-                } else {
-                    if (stageNo > progress.getMaxStageCleared()) {
-                        progress.setMaxStageCleared(stageNo);
-                        userCivProgressMapper.update(progress);
-                    }
-                }
-
-                // Handle General Injury
-                BattleContext.HeroState h = ctx.getAlly().getHero();
-                if (h != null) {
-                    UserGeneralTbl g = userGeneralMapper.selectById(h.getGeneralId());
-                    if (g != null) {
-                        double ratio = (double) h.getCurrentHp() / h.getMaxHp();
-                        if (ratio < 0.5) { // Injured
-                            g.setRestTurns(3); // Rest 3 turns
-                            userGeneralMapper.update(g); // Need update method
-                        }
-                    }
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            // --- Unlock Logic ---
-            try {
-                // 1. Current Stage Info
+                // 2. Update Progress (One Source of Truth)
                 String civ = session.getCiv();
                 if (civ == null) civ = "CN";
-                Integer stageNo = session.getDungeonId();
+                Integer stageNo = session.getStageNo();
 
-                // 2. Unlock Next Stage
                 UserCivProgressTbl progress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), civ);
                 if (progress == null) {
-                    progress = new UserCivProgressTbl();
-                    progress.setUserId(session.getUserId());
-                    progress.setCiv(civ);
-                    progress.setMaxStageCleared(stageNo);
-                    progress.setUnlocked(true);
-                    userCivProgressMapper.insert(progress);
+                     // Should generally not happen if validated at start, but handle it
+                     progress = new UserCivProgressTbl();
+                     progress.setUserId(session.getUserId());
+                     progress.setCiv(civ);
+                     progress.setMaxStageCleared(stageNo);
+                     progress.setUnlocked(true);
+                     userCivProgressMapper.insert(progress);
                 } else {
-                    if (stageNo >= progress.getMaxStageCleared()) { // >= because if I clear 5, max should be 5 (unlocks 6 check later)
-                        // Actually logic is: if current is 5, max cleared becomes 5.
-                        // canEnter uses maxStageCleared + 1.
-                        if (stageNo > progress.getMaxStageCleared()) {
-                             progress.setMaxStageCleared(stageNo);
-                             userCivProgressMapper.update(progress);
-                        }
-                    }
+                     if (stageNo > progress.getMaxStageCleared()) {
+                         progress.setMaxStageCleared(stageNo);
+                         userCivProgressMapper.update(progress);
+                     }
                 }
 
                 // 3. Unlock Hero (Stage 1, 5, 10)
@@ -812,17 +773,12 @@ public class BattleService {
                 if (unlockHeroTplId != null) {
                     UserGeneralTbl existingHero = userGeneralMapper.selectByUserIdAndTemplateId(session.getUserId(), unlockHeroTplId);
                     if (existingHero == null) {
-                        // Grant Hero
                         GeneralTemplateTbl tpl = generalTemplateMapper.selectById(unlockHeroTplId);
                         if (tpl != null) {
                             UserGeneralTbl newHero = new UserGeneralTbl();
                             newHero.setUserId(session.getUserId());
                             newHero.setTemplateId(unlockHeroTplId);
                             newHero.setUnlocked(true);
-                            newHero.setActivated(true); // Auto activate reward? User "Unlock" usually means unlocked to recruit?
-                            // Requirement says "Unlock Hero". Usually implies available.
-                            // Let's set Activated=false (need to pay?) or true?
-                            // "1/5/10 unlock heroes". Let's auto-activate for smooth flow in MVP.
                             newHero.setActivated(true);
                             newHero.setLevel(1);
                             newHero.setTier(0);
@@ -837,7 +793,7 @@ public class BattleService {
 
                 // 4. Unlock Next Country (Stage 10)
                 if (stageNo == 10 && "CN".equals(civ)) {
-                    String nextCiv = "JP"; // Simplified
+                    String nextCiv = "JP"; 
                     UserCivProgressTbl nextProgress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), nextCiv);
                     if (nextProgress == null) {
                         nextProgress = new UserCivProgressTbl();
@@ -849,6 +805,19 @@ public class BattleService {
                     } else if (!nextProgress.getUnlocked()) {
                         nextProgress.setUnlocked(true);
                         userCivProgressMapper.update(nextProgress);
+                    }
+                }
+
+                // 5. Handle General Injury
+                BattleContext.HeroState h = ctx.getAlly().getHero();
+                if (h != null) {
+                    UserGeneralTbl g = userGeneralMapper.selectById(h.getGeneralId());
+                    if (g != null) {
+                        double ratio = (double) h.getCurrentHp() / h.getMaxHp();
+                        if (ratio < 0.5) { // Injured
+                            g.setRestTurns(3); 
+                            userGeneralMapper.update(g); 
+                        }
                     }
                 }
 

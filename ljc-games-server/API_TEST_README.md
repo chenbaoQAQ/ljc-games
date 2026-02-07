@@ -133,8 +133,3 @@ curl -X POST "http://localhost:8080/hall/gem/inlay" \
 重置数据以进行新一轮测试：
 重启服务器 (重载 `data.sql`)
 或者运行 SQL:
-```sql
-DELETE FROM battle_sessions;
-DELETE FROM user_generals WHERE id > 2;
-UPDATE user_civ_progress SET max_stage_cleared=0 WHERE user_id=1;
-```
