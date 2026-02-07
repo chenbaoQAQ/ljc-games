@@ -248,7 +248,7 @@ CREATE TABLE currency_ledger (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
 
-  currency_type VARCHAR(10) NOT NULL, -- GOLD/DIAMOND/STAMINA
+  currency_type VARCHAR(10) NOT NULL, -- GOLD/DIAMOND
   delta BIGINT NOT NULL,
   before_value BIGINT NOT NULL,
   after_value BIGINT NOT NULL,
@@ -449,7 +449,7 @@ CREATE TABLE story_stage_config (
   wall_cost_troops INT NOT NULL DEFAULT 0,  -- 城墙关额外扣兵（例如100）
   enemy_multiplier INT NOT NULL DEFAULT 1000,
 
-  enemy_troop_comp_json JSON NOT NULL,
+  enemy_config_json JSON NOT NULL,
   drop_pool_id INT DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (civ, stage_no)
@@ -465,6 +465,6 @@ CREATE TABLE tower_floor_config (
   floor_type VARCHAR(10) NOT NULL,
   enemy_multiplier INT NOT NULL DEFAULT 1000,
 
-  enemy_troop_comp_json JSON NOT NULL,
+  enemy_config_json JSON NOT NULL,
   drop_pool_id INT NOT NULL
 ) ENGINE=InnoDB;

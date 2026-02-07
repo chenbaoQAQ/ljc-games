@@ -125,7 +125,7 @@ public class BattleService {
                     int dRows = userTroopMapper.safeDeduct(userId, entry.getKey(), count);
                     if (dRows <= 0) {
                         throw new RuntimeException("Not enough troops for ID: " + entry.getKey());
-                        // Note: Transaction will rollback stamina deduction too.
+                        // Note: Transaction will rollback.
                     }
                 }
             }
@@ -738,7 +738,9 @@ public class BattleService {
                 }
 
                 // Update Progress 
-                String civ = "CN"; // Hardcoded for MVP
+                // Update Progress 
+                String civ = session.getCiv(); 
+                if (civ == null) civ = "CN"; 
                 Integer stageNo = session.getDungeonId();
                 UserCivProgressTbl progress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), civ);
                 if (progress == null) {
@@ -775,8 +777,8 @@ public class BattleService {
             // --- Unlock Logic ---
             try {
                 // 1. Current Stage Info
-                String civ = "CN"; // Hardcoded for MVP, ideally session.getCiv()
-                if (session.getCiv() != null) civ = session.getCiv();
+                String civ = session.getCiv();
+                if (civ == null) civ = "CN";
                 Integer stageNo = session.getDungeonId();
 
                 // 2. Unlock Next Stage

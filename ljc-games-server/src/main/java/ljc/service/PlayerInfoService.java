@@ -40,7 +40,8 @@ public class PlayerInfoService {
         resp.setNickname(user.getNickname());
         resp.setGold(user.getGold());
         resp.setDiamond(user.getDiamond());
-        // resp.setStamina(user.getStamina()); // 如果DTO里有体力就取消注释
+
+
 
         // === 任务 B: 搬运兵力列表 ===
         List<PlayerInfoResp.TroopDto> dtoList = new ArrayList<>();

@@ -25,7 +25,7 @@ class LjcGamesApplicationTests {
         newUser.setInitialCiv("CN");
         newUser.setGold(1000L);
         newUser.setDiamond(100L);
-        newUser.setStamina(100);
+
 
         // 2. 插入数据库
         System.out.println("正在插入用户...");

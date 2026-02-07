@@ -82,7 +82,7 @@ INSERT INTO user_inventory (user_id, item_id, count) VALUES
 -- 简单起见，所有关卡敌人配置类似，只是属性倍率不同
 -- enemy_config_json 包含 hero 和 troops
 -- 格式: { "hero": {...}, "troops": [...] }
-INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, enemy_multiplier, drop_pool_id, enemy_troop_comp_json) VALUES
+INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, enemy_multiplier, drop_pool_id, enemy_config_json) VALUES
 ('CN', 1, 'NORMAL', 0, 1000, 1, '{"hero":{"name":"山贼头目","maxHp":1000,"currentHp":1000,"atk":50,"speed":40,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":10,"unitHp":20,"frontHp":20}]}'),
 ('CN', 2, 'NORMAL', 0, 1100, 1, '{"hero":{"name":"黄巾小队长","maxHp":1200,"currentHp":1200,"atk":60,"speed":45,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":20,"unitHp":20,"frontHp":20}]}'),
 ('CN', 3, 'NORMAL', 0, 1200, 1, '{"hero":{"name":"黄巾猛将","maxHp":1500,"currentHp":1500,"atk":70,"speed":50,"personality":"BERSERKER"},"troops":[{"troopId":2001,"type":"INF","count":30,"unitHp":20,"frontHp":20}]}'),
