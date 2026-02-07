@@ -15,7 +15,7 @@ public class UserTbl {
     private String nickname;
     private Long gold;
     private Long diamond;
-    private Integer stamina;
     private String initialCiv;
+
     private LocalDateTime createdAt;
 }

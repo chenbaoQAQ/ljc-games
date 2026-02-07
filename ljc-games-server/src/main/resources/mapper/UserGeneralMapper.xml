@@ -27,4 +27,8 @@
     <select id="selectById" resultType="ljc.entity.UserGeneralTbl">
         SELECT * FROM user_generals WHERE id = #{id}
     </select>
+    
+    <select id="selectByUserIdAndTemplateId" resultType="ljc.entity.UserGeneralTbl">
+        SELECT * FROM user_generals WHERE user_id = #{userId} AND template_id = #{templateId}
+    </select>
 </mapper>

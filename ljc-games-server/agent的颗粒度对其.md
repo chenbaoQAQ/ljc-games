@@ -64,6 +64,14 @@
 
 ---
 
-**总结**: 
-后端已完成 Story Mode V2.8 的所有核心硬性要求（兵是个体、溢出算法、性格撤退、城墙扣除）。接口文档已更新，可直接进测试。
+
+## 3. 近期更新 (Recent Updates)
+- [x] **体力系统移除**: 彻底删除了 DB (`users`), Entity (`UserTbl`), Service (`BattleService/PlayerInfoService`) 中的所有体力逻辑，实现了无限挑战。
+- [x] **Bug Fixes**:
+    - 修复了 `BattleService` 中 `source` 参数命名不一致导致的编译错误。
+    - 修复了 `BattleSessionTbl` 缺失 `civ` 字段导致的编译错误。
+    - 修复了 `BattleService` 中 `session` 变量未初始化的错误。
+    - 修复了 `AuthService` 中残留的 `setStamina` 调用。
+- [x] **验证通过**: 提供了 `API_TEST_README.md` 并通过了核心流程的编译检查。
+
 

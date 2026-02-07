@@ -440,4 +440,13 @@ public class HallService {
         
         userGeneralMapper.update(general);
     }
+
+    public List<UserGeneralTbl> getGenerals(Long userId) {
+        return userGeneralMapper.selectByUserId(userId);
+    }
+
+    public List<UserCivProgressTbl> getProgress(Long userId) {
+        return userCivProgressMapper.selectByUserId(userId);
+    }
 }
+

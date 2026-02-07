@@ -3,18 +3,19 @@
 <mapper namespace="ljc.mapper.UserMapper">
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO users (username, password_hash, nickname, gold, diamond, stamina, initial_civ, created_at)
-        VALUES (#{username}, #{passwordHash}, #{nickname}, #{gold}, #{diamond}, #{stamina}, #{initialCiv}, NOW())
+        INSERT INTO users (username, password_hash, nickname, gold, diamond, initial_civ, created_at)
+        VALUES (#{username}, #{passwordHash}, #{nickname}, #{gold}, #{diamond}, #{initialCiv}, NOW())
     </insert>
+
 
     <update id="update">
         UPDATE users
         SET nickname = #{nickname},
             gold = #{gold},
-            diamond = #{diamond},
-            stamina = #{stamina}
+            diamond = #{diamond}
         WHERE id = #{id}
     </update>
+
 
     <update id="reduceGold">
         UPDATE users
@@ -22,11 +23,7 @@
         WHERE id = #{userId} AND gold >= #{cost}
     </update>
 
-    <update id="reduceStamina">
-        UPDATE users
-        SET stamina = stamina - #{cost}
-        WHERE id = #{userId} AND stamina >= #{cost}
-    </update>
+
 
     <select id="selectByUsername" resultType="ljc.entity.UserTbl">
         SELECT * FROM users WHERE username = #{username}

@@ -57,9 +57,9 @@ CREATE TABLE users (
 
   gold BIGINT NOT NULL DEFAULT 0,
   diamond BIGINT NOT NULL DEFAULT 0,
-  stamina INT NOT NULL DEFAULT 0,
 
   initial_civ VARCHAR(10) NOT NULL,
+
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   INDEX idx_users_created (created_at)
@@ -446,9 +446,9 @@ CREATE TABLE story_stage_config (
   civ VARCHAR(10) NOT NULL,
   stage_no INT NOT NULL,
   stage_type VARCHAR(10) NOT NULL,          -- NORMAL/WALL/BOSS
-  stamina_cost INT NOT NULL DEFAULT 0,
   wall_cost_troops INT NOT NULL DEFAULT 0,  -- 城墙关额外扣兵（例如100）
   enemy_multiplier INT NOT NULL DEFAULT 1000,
+
   enemy_troop_comp_json JSON NOT NULL,
   drop_pool_id INT DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -463,8 +463,8 @@ CREATE TABLE drop_pool (
 CREATE TABLE tower_floor_config (
   floor_no INT PRIMARY KEY,
   floor_type VARCHAR(10) NOT NULL,
-  stamina_cost INT NOT NULL DEFAULT 0,
   enemy_multiplier INT NOT NULL DEFAULT 1000,
+
   enemy_troop_comp_json JSON NOT NULL,
   drop_pool_id INT NOT NULL
 ) ENGINE=InnoDB;

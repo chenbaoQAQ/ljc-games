@@ -1,190 +1,140 @@
-# 接口测试指南 (API Test README)
+# API Verification Guide
 
-本文档提供适配 **Apifox** 的接口测试用例。你可以直接复制下方的 `curl` 命令并在 Apifox 中选择 "导入 cURL" 即可快速生成接口。
+This document provides `curl` commands to test the core features of the LJC Game Server, focusing on the Hall System, Battle Logic, and Story Progression (1-1 to 1-10).
 
-> **环境依赖**:
-> 1. 服务器已启动 (`LjcGamesServerApplication`)。
-> 2. `data.sql` 已包含基础数据 (启动后自动加载)。
-> 3. 默认主机: `http://localhost:8080` (在 Apifox 中建议配置为环境变量 `{{baseUrl}}`)。
+## Prerequisites
 
-## 0. 数据重置 (Reset Data)
-*如果遇到数据异常或想要重头开始，请重启服务器，或重新运行 `src/main/resources/data.sql` 脚本（已支持热重置）。*
+- Server running on `localhost:8080` (or configured port)
+- `curl` installed
+- `jq` installed (optional, for pretty printing JSON)
+- Database initialized with `data.sql`
 
----
+## 1. User & Initial State
 
-## 1. 账号体系 (Auth)
-
-该系统现已预置测试账号 (`userId=1`)。如需创建新号，请使用注册接口。
-
-### 注册新账号
-*如果需要测试多用户流程，可先注册新号*
+### 1.1 Check Initial Generals (Admin User ID: 1)
 ```bash
-curl -X POST "http://localhost:8080/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "测试数据",
-    "password": "123",
-    "nickname": "李俊辰",
-    "initialCiv": "CN"
-  }'
+curl "http://localhost:8080/hall/generals?userId=1"
+```
+*Expected:* Should return General 1001 (Activated) and 1002 (Not Activated).
+
+### 1.2 Check Initial Progress
+```bash
+curl "http://localhost:8080/hall/progress?userId=1"
+```
+*Expected:* Empty list or initial CN record (if initialized).
+
+## 2. Hall System
+
+### 2.1 Recruit Troops
+Recruit 50 Infantry (ID: 2001)
+```bash
+curl -X POST "http://localhost:8080/hall/recruit?userId=1" \
+     -H "Content-Type: application/json" \
+     -d '{"troopId": 2001, "count": 50}'
 ```
 
----
-
-## 1. 大厅系统 (Hall System)
-
-**测试前置**: 使用预置账号 `userId=1`，已拥有初始武将(ID=1001)、装备(ID=1)和金币。
-
-### 1.1 武将管理
-
-#### 激活武将 (Activate)
-*消耗金币激活已解锁的武将 (测试用ID: 2)*
+### 2.2 Activate General
+Activate General 1002 (Needs 1000 Gold, user has 100000)
 ```bash
 curl -X POST "http://localhost:8080/hall/general/activate?userId=1&generalId=2"
 ```
+*Note:* `generalId` depends on DB ID. In `data.sql`, user_generals ids are auto-increment. Check DB or response from 1.1. Assuming ID 2 for Template 1002.
 
-#### 升级武将 (Upgrade)
-*消耗金币提升等级，每次调用升1级*
+### 2.3 Upgrade General
+Upgrade General 1 (Template 1001)
 ```bash
 curl -X POST "http://localhost:8080/hall/general/upgrade?userId=1&generalId=1"
 ```
 
-#### 穿戴装备 (Equip)
-*将"铁剑" (ID=1) 穿戴到"新手主公"的武器槽*
+## 3. Battle System (Story Loop)
+
+### 3.1 Start Battle (Stage 1-1)
+*   **Civ:** CN
+*   **Stage:** 1
+*   **General:** 1 (UserGeneral ID)
+*   **Troops:** 10 Infantry (Troop ID 2001)
+
 ```bash
-curl -X POST "http://localhost:8080/hall/general/equip?userId=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "generalId": 1,
-    "equipmentId": 1
-  }'
+curl -X POST "http://localhost:8080/battle/start" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "userId": 1,
+       "civ": "CN",
+       "stageNo": 1,
+       "generalId": 1,
+       "troops": {
+         "2001": 10
+       }
+     }'
+```
+*Response:* Returns `battleId` (e.g., `1707300000000`).
+
+### 3.2 Process Turn (Loop until End)
+Replace `1707300000000` with actual `battleId`.
+```bash
+curl -X POST "http://localhost:8080/battle/action" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "userId": 1,
+       "battleId": 1707300000000,
+       "castSkill": false
+     }'
+```
+*Check `ended: true` and `win: true` in response.*
+
+### 3.3 Verify Unlock (After Stage 1 Win)
+Check if General 1002 is unlocked (if not already).
+```bash
+curl "http://localhost:8080/hall/generals?userId=1"
 ```
 
-#### 学习技能 (Learn Skill)
-*消耗背包中的技能书 (ItemID=301) 学习技能*
+### 3.4 Progress to Stage 1-10 (Simulation)
+To test Stage 10 unlock, you can repeat 3.1 and 3.2 for Stage 10 (assuming you cheat or play through 2-9).
+
+**Start Stage 10 (Boss):**
 ```bash
-curl -X POST "http://localhost:8080/hall/skill/learn?userId=1&generalId=1&bookItemId=301"
+curl -X POST "http://localhost:8080/battle/start" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "userId": 1,
+       "civ": "CN",
+       "stageNo": 10,
+       "generalId": 1,
+       "troops": {
+         "2001": 100,
+         "2003": 50
+       }
+     }'
 ```
 
-### 1.3 资源与招募
-
-#### 招兵 (Recruit)
-*消耗金币招募兵种 (ID=1001), 数量=10*
+After winning Stage 10, check for **Next Country Unlock**:
 ```bash
-curl -X POST "http://localhost:8080/hall/recruit?userId=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "troopId": 1001,
-    "count": 10
-  }'
+curl "http://localhost:8080/hall/progress?userId=1"
 ```
+*Expected:* CN Max Stage 10, JP Unlocked.
 
-#### 宝石合成 (Combine Gem)
-*消耗5颗同类同级宝石合成高一级宝石*
-```bash
-curl -X POST "http://localhost:8080/hall/gem/combine?userId=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "gemType": "ATK",
-    "level": 1
-  }'
-```
+## 4. Other Features
 
-#### 武将升阶 (Ascend)
-*消耗金币提升武将阶数 (Break Limit)*
-```bash
-curl -X POST "http://localhost:8080/hall/general/ascend?userId=1&generalId=1"
-```
-
-### 1.2 装备与宝石
-
-#### 强化装备 (Enhance)
-*消耗金币强化装备等级*
+### 4.1 Equipment Enhance
+Enhance Equipment 1
 ```bash
 curl -X POST "http://localhost:8080/hall/equipment/enhance?userId=1&equipmentId=1"
 ```
 
-#### 宝石镶嵌 (Inlay)
-*将攻击宝石 (ID=1) 镶嵌到装备的第1个孔位*
+### 4.2 Gem Inlay
+Inlay Gem 1 into Equipment 1 Slot 1
 ```bash
-curl -X POST "http://localhost:8080/hall/gem/inlay?userId=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "equipmentId": 1,
-    "socketIndex": 1,
-    "gemId": 1
-  }'
+curl -X POST "http://localhost:8080/hall/gem/inlay" \
+     -H "Content-Type: application/json" \
+     -d '{"equipmentId": 1, "socketIndex": 1, "gemId": 1}'
 ```
 
----
-
-## 2. 战斗框架 (Battle)
-
-> **重要提示**: 战斗模块依赖新的数据库表。请务必先执行以下 SQL 脚本：
-> `src/main/resources/schema_update_battle.sql`
-
-
-### 开始战斗 (Start)
-*创建一场新战斗会话 (Session)*
-```bash
-curl -X POST "http://localhost:8080/battle/start?userId=1&dungeonId=101"
+## 5. Clean Reset
+To reset data for fresh test:
+Restart server (reloads `data.sql`)
+OR run:
+```sql
+DELETE FROM battle_session;
+DELETE FROM user_generals WHERE id > 2;
+UPDATE user_civ_progress SET max_stage_cleared=0 WHERE user_id=1;
 ```
-> **注意**: 响应中的 `data` 即为 `battleId` (虽然实际逻辑使用 userId 查找会话，但 ID 可用于展示).
-
-### 回合行动 (Action / Turn)
-*推进到下一回合 (可选择是否施放技能)*
-```bash
-curl -X POST "http://localhost:8080/battle/turn?userId=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "castSkill": true
-  }'
-```
-*响应包含了当前的 Context 快照，以及 **logs** 字段，记录了本回合详细的战斗日志（扣血、技能释放、撤退等）。*
-
----
-
----
-
-## 3. 剧情模式 (Story Mode MVP)
-
-> **前置要求**:
-> 1. 执行 SQL 脚本: `src/main/resources/schema_update_story.sql` (初始化关卡配置)
-> 2. 确保 `schema_update_battle.sql` 也已执行。
-
-### 3.1 查询关卡信息
-*查看第1关的 enemy_config 和体力消耗*
-```bash
-curl -X GET "http://localhost:8080/stage/story/CN/1"
-```
-
-### 3.2 开启剧情战斗
-*扣除体力与兵力，进入战斗*
-```bash
-curl -X POST "http://localhost:8080/battle/story/start?userId=1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "civ": "CN",
-    "stageNo": 1,
-    "generalId": 1,
-    "troopConfig": {
-        "1001": 10
-    }
-  }'
-```
-
-### 3.3 推进回合 (同上)
-使用 `POST /battle/turn` 接口。当 `ctx.status != 0` 时，表示战斗结束（胜利/失败）。
-胜利后，系统会自动：
-1. 返还幸存士兵。
-2. 更新最大通关进度。
-
----
-
-## 常见问题 (FAQ)
-
-1. **报错 "武将不存在"**: 请确认是否重启了服务器以加载新的 `data.sql`。
-2. **Apifox 使用技巧**:
-   - 复制上方的代码块。
-   - 在 Apifox 左上角点击 **+** -> **导入 cURL**。
-   - 粘贴代码即可自动解析 Body 和 Params。

@@ -115,13 +115,7 @@ public class BattleService {
             }
         }
 
-        // 7. Atomic Deductions (Stamina & Troops)
-        // Stamina
-        int staminaCost = stageConfig.getStaminaCost() == null ? 10 : stageConfig.getStaminaCost();
-        int rows = userMapper.reduceStamina(userId, staminaCost);
-        if (rows <= 0) {
-            throw new RuntimeException("Not enough stamina!");
-        }
+
 
         // Troops (Deduct original config amount from Inventory)
         if (troopConfig != null) {
@@ -179,6 +173,7 @@ public class BattleService {
         BattleSessionTbl session = new BattleSessionTbl();
         session.setUserId(userId);
         session.setBattleId(ctx.getBattleId());
+        session.setCiv(civ); // Set Civ
         session.setDungeonId(stageNo);
         session.setStatus(0);
         session.setCurrentTurn(1);
@@ -559,21 +554,34 @@ public class BattleService {
         for (BattleContext.TroopStack s : attacker.getTroops()) {
             if (s.getType().equals(type) && s.isAlive()) {
                 long dmg = s.getCount() * 10; // Simplified Dmg
-                // logs.add(s.getType() + " attacks! Dmg: " + dmg);
-                executeDamage(dmg, defender, "TROOP", logs);
+                executeDamage(dmg, defender, type, logs); // Pass specific type
             }
         }
     }
 
+
     private void executeHeroAttack(BattleContext.SideContext attacker, BattleContext.SideContext defender, List<String> logs) {
         if (canAct(attacker.getHero())) {
             long dmg = attacker.getHero().getAtk();
+
+            // Last Stand Bonus
+            double hpRatio = (double)attacker.getHero().getCurrentHp() / attacker.getHero().getMaxHp();
+            if (hpRatio <= 0.1) {
+                // Check Personality
+                PersonalityConfigTbl p = personalityConfigMapper.selectByCode(attacker.getHero().getPersonality());
+                if (p != null && (p.getLastStandBias() == null ? 0 : p.getLastStandBias()) > 0) { // Brave/Berserker
+                     dmg = (long)(dmg * 1.2);
+                     logs.add(attacker.getHero().getName() + " enters Last Stand! (+20% Dmg)");
+                }
+            }
+
             logs.add(attacker.getHero().getName() + " attacks! Dmg: " + dmg);
             executeDamage(dmg, defender, "HERO_ATK", logs);
         }
     }
 
-    private void executeDamage(long dmg, BattleContext.SideContext targetSide, String source, List<String> logs) {
+
+    private void executeDamage(long dmg, BattleContext.SideContext targetSide, String sourceType, List<String> logs) {
         // Target Logic
         // 1. If Source == HERO -> Priority: Hero (if alive)
         // 2. If Source == TROOP -> Priority: Counter > Elite > ARC > CAV > INF
@@ -585,13 +593,14 @@ public class BattleService {
         // Skill -> Hero.
         // Normal Attack -> Troops first (Protection).
 
-        if ("SKILL".equals(source)) {
+        if ("SKILL".equals(sourceType)) {
             // Attack Hero directly
             if (canAct(targetSide.getHero())) {
                 dealDamageToHero(targetSide.getHero(), dmg, logs);
                 return;
             }
         }
+
 
         // Find Troop Target
         BattleContext.TroopStack target = findTargetStack(targetSide.getTroops());
@@ -604,8 +613,31 @@ public class BattleService {
             return;
         }
 
+        // Apply Counter Multiplier if Troop vs Troop
+        // Types: INF, ARC, CAV
+        // INF > ARC > CAV > INF
+        double multiplier = 1.0;
+        if (!"HERO_ATK".equals(sourceType) && !"SKILL".equals(sourceType)) {
+             String tType = target.getType();
+             if ("INF".equals(sourceType)) {
+                 if ("ARC".equals(tType)) multiplier = 1.2;
+                 else if ("CAV".equals(tType)) multiplier = 0.8;
+             } else if ("ARC".equals(sourceType)) {
+                 if ("CAV".equals(tType)) multiplier = 1.2;
+                 else if ("INF".equals(tType)) multiplier = 0.8;
+             } else if ("CAV".equals(sourceType)) {
+                 if ("INF".equals(tType)) multiplier = 1.2;
+                 else if ("ARC".equals(tType)) multiplier = 0.8;
+             }
+        }
+        
+        long finalDmg = (long)(dmg * multiplier);
+        if (multiplier > 1.0) logs.add("Counter Attack! (x" + multiplier + ")");
+        else if (multiplier < 1.0) logs.add("Weak Attack... (x" + multiplier + ")");
+
         // Apply Damage to Stack (with overflow)
-        long remaining = dmg;
+        long remaining = finalDmg;
+
         while (remaining > 0 && target != null) {
             remaining = applyDamageToStack(target, remaining, logs);
             if (remaining > 0) {
@@ -733,6 +765,88 @@ public class BattleService {
                             g.setRestTurns(3); // Rest 3 turns
                             userGeneralMapper.update(g); // Need update method
                         }
+                    }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // --- Unlock Logic ---
+            try {
+                // 1. Current Stage Info
+                String civ = "CN"; // Hardcoded for MVP, ideally session.getCiv()
+                if (session.getCiv() != null) civ = session.getCiv();
+                Integer stageNo = session.getDungeonId();
+
+                // 2. Unlock Next Stage
+                UserCivProgressTbl progress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), civ);
+                if (progress == null) {
+                    progress = new UserCivProgressTbl();
+                    progress.setUserId(session.getUserId());
+                    progress.setCiv(civ);
+                    progress.setMaxStageCleared(stageNo);
+                    progress.setUnlocked(true);
+                    userCivProgressMapper.insert(progress);
+                } else {
+                    if (stageNo >= progress.getMaxStageCleared()) { // >= because if I clear 5, max should be 5 (unlocks 6 check later)
+                        // Actually logic is: if current is 5, max cleared becomes 5.
+                        // canEnter uses maxStageCleared + 1.
+                        if (stageNo > progress.getMaxStageCleared()) {
+                             progress.setMaxStageCleared(stageNo);
+                             userCivProgressMapper.update(progress);
+                        }
+                    }
+                }
+
+                // 3. Unlock Hero (Stage 1, 5, 10)
+                Integer unlockHeroTplId = null;
+                if ("CN".equals(civ)) {
+                    if (stageNo == 1) unlockHeroTplId = 1002;
+                    else if (stageNo == 5) unlockHeroTplId = 1003;
+                    else if (stageNo == 10) unlockHeroTplId = 1004;
+                }
+                
+                if (unlockHeroTplId != null) {
+                    UserGeneralTbl existingHero = userGeneralMapper.selectByUserIdAndTemplateId(session.getUserId(), unlockHeroTplId);
+                    if (existingHero == null) {
+                        // Grant Hero
+                        GeneralTemplateTbl tpl = generalTemplateMapper.selectById(unlockHeroTplId);
+                        if (tpl != null) {
+                            UserGeneralTbl newHero = new UserGeneralTbl();
+                            newHero.setUserId(session.getUserId());
+                            newHero.setTemplateId(unlockHeroTplId);
+                            newHero.setUnlocked(true);
+                            newHero.setActivated(true); // Auto activate reward? User "Unlock" usually means unlocked to recruit?
+                            // Requirement says "Unlock Hero". Usually implies available.
+                            // Let's set Activated=false (need to pay?) or true?
+                            // "1/5/10 unlock heroes". Let's auto-activate for smooth flow in MVP.
+                            newHero.setActivated(true);
+                            newHero.setLevel(1);
+                            newHero.setTier(0);
+                            newHero.setMaxHp(tpl.getBaseHp());
+                            newHero.setCurrentHp(tpl.getBaseHp());
+                            newHero.setCapacity(tpl.getBaseCapacity());
+                            newHero.setRestTurns(0);
+                            userGeneralMapper.insert(newHero);
+                        }
+                    }
+                }
+
+                // 4. Unlock Next Country (Stage 10)
+                if (stageNo == 10 && "CN".equals(civ)) {
+                    String nextCiv = "JP"; // Simplified
+                    UserCivProgressTbl nextProgress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), nextCiv);
+                    if (nextProgress == null) {
+                        nextProgress = new UserCivProgressTbl();
+                        nextProgress.setUserId(session.getUserId());
+                        nextProgress.setCiv(nextCiv);
+                        nextProgress.setMaxStageCleared(0);
+                        nextProgress.setUnlocked(true);
+                        userCivProgressMapper.insert(nextProgress);
+                    } else if (!nextProgress.getUnlocked()) {
+                        nextProgress.setUnlocked(true);
+                        userCivProgressMapper.update(nextProgress);
                     }
                 }
 

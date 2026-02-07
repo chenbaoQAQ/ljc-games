@@ -13,5 +13,8 @@ public interface UserGeneralMapper {
     UserGeneralTbl selectById(Long id);
 
     int update(UserGeneralTbl entity);
+    
+    UserGeneralTbl selectByUserIdAndTemplateId(@org.apache.ibatis.annotations.Param("userId") Long userId, @org.apache.ibatis.annotations.Param("templateId") Integer templateId);
 }
+
 

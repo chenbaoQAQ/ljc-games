@@ -93,7 +93,18 @@ public class HallController {
         hallService.ascendGeneral(userId, generalId);
         return Result.success("升阶成功");
     }
+
+    @GetMapping("/progress")
+    public Result<java.util.List<ljc.entity.UserCivProgressTbl>> getProgress(@RequestParam Long userId) {
+        return Result.success(hallService.getProgress(userId)); // Use Service method
+    }
+
+    @GetMapping("/generals")
+    public Result<java.util.List<ljc.entity.UserGeneralTbl>> getGenerals(@RequestParam Long userId) {
+        return Result.success(hallService.getGenerals(userId));
+    }
 }
+
 
 
 

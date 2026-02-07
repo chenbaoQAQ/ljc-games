@@ -31,7 +31,7 @@ public class AuthService {
         // 给点启动资金 (也可以写在常量里)
         user.setGold(1000L);
         user.setDiamond(100L);
-        user.setStamina(100);
+
 
         // 2. 存入数据库 (获取 userId)
         userMapper.insert(user);

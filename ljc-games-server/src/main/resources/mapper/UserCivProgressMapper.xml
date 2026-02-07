@@ -15,4 +15,9 @@
             max_stage_cleared = #{maxStageCleared}
         WHERE user_id = #{userId} AND civ = #{civ}
     </update>
+
+    <select id="selectByUserId" resultType="ljc.entity.UserCivProgressTbl">
+        SELECT * FROM user_civ_progress WHERE user_id = #{userId}
+    </select>
 </mapper>
+
