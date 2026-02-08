@@ -2,9 +2,15 @@ package ljc.controller;
 
 import ljc.common.Result;
 import ljc.controller.dto.PlayerInfoResp;
+import ljc.entity.UserCivProgressTbl;
 import ljc.service.PlayerInfoService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/player")
@@ -19,11 +25,17 @@ public class PlayerController {
      */
     @GetMapping("/info")
     public Result<PlayerInfoResp> getPlayerInfo(@RequestParam Long userId) {
-
-        // TODO: 调用 Service，拿到 resp
         PlayerInfoResp resp = playerInfoService.getPlayerInfo(userId);
-
-        // 用我们写的统一盒子包装成功结果
         return Result.success(resp);
+    }
+
+    /**
+     * 四国进度查询
+     * URL: GET /player/progress?userId=1
+     */
+    @GetMapping("/progress")
+    public Result<List<UserCivProgressTbl>> getPlayerProgress(@RequestParam Long userId) {
+        List<UserCivProgressTbl> progressList = playerInfoService.getPlayerProgress(userId);
+        return Result.success(progressList);
     }
 }

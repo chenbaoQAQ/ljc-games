@@ -15,10 +15,11 @@ public class PlayerInitService {
     private final UserGeneralSkillMapper userGeneralSkillMapper;
     private final UserTroopMapper userTroopMapper;
     private final GeneralTemplateMapper generalTemplateMapper;
+    private final TroopTemplateMapper troopTemplateMapper;
 
     // 常量配置
     private static final int START_GENERAL_ID = 1001; // 初始武将ID
-    private static final int START_TROOP_ID = 1001;      // 义勇兵ID
+    private static final int START_TROOP_ID = 2001;      // 义勇兵ID (或CN步兵ID)
     private static final int START_TROOP_COUNT = 100; // 送100个
 
     /**
@@ -97,6 +98,11 @@ public class PlayerInitService {
 
 
         // 3. 发放初始兵力
+        TroopTemplateTbl troopTpl = troopTemplateMapper.selectById(START_TROOP_ID);
+        if (troopTpl == null) {
+            throw new RuntimeException("初始兵种模板缺失: ID " + START_TROOP_ID);
+        }
+
         // 创建 UserTroopTbl 对象
         UserTroopTbl troop = new UserTroopTbl();
         // 给予 userId, START_TROOP_ID, START_TROOP_COUNT

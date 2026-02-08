@@ -1,8 +1,10 @@
 package ljc.service;
 
 import ljc.controller.dto.PlayerInfoResp;
+import ljc.entity.UserCivProgressTbl;
 import ljc.entity.UserTbl;
 import ljc.entity.UserTroopTbl;
+import ljc.mapper.UserCivProgressMapper;
 import ljc.mapper.UserMapper;
 import ljc.mapper.UserTroopMapper;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ public class PlayerInfoService {
 
     private final UserMapper userMapper;
     private final UserTroopMapper userTroopMapper;
+    private final UserCivProgressMapper userCivProgressMapper;
 
     /**
      * 获取玩家主界面信息
@@ -41,14 +44,11 @@ public class PlayerInfoService {
         resp.setGold(user.getGold());
         resp.setDiamond(user.getDiamond());
 
-
-
         // === 任务 B: 搬运兵力列表 ===
         List<PlayerInfoResp.TroopDto> dtoList = new ArrayList<>();
 
         for (UserTroopTbl t : myTroops) {
             PlayerInfoResp.TroopDto dto = new PlayerInfoResp.TroopDto();
-            // 注意：这里要做个小转型，因为数据库定义的可能是 Integer，DTO 定义的是 Integer
             dto.setTroopId(t.getTroopId());
             dto.setCount(t.getCount());
             dtoList.add(dto);
@@ -58,5 +58,12 @@ public class PlayerInfoService {
         resp.setTroops(dtoList);
 
         return resp;
+    }
+
+    /**
+     * 获取玩家四国进度
+     */
+    public List<UserCivProgressTbl> getPlayerProgress(Long userId) {
+        return userCivProgressMapper.selectByUserId(userId);
     }
 }

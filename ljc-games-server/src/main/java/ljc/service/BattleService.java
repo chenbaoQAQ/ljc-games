@@ -202,8 +202,10 @@ public class BattleService {
     private final UserGemMapper userGemMapper;
     private final StoryStageConfigMapper storyStageConfigMapper;
     private final UserCivProgressMapper userCivProgressMapper;
-    private final PersonalityConfigMapper personalityConfigMapper; // Added
+    private final StoryUnlockConfigMapper storyUnlockConfigMapper; // Added
+    private final PersonalityConfigMapper personalityConfigMapper;
     private final ObjectMapper objectMapper;
+
 
     // Helper for Hero Stats
     private BattleContext.HeroState buildHeroState(Long userId, UserGeneralTbl general) {
@@ -762,53 +764,52 @@ public class BattleService {
                      }
                 }
 
-                // 3. Unlock Hero (Stage 1, 5, 10)
-                Integer unlockHeroTplId = null;
-                if ("CN".equals(civ)) {
-                    if (stageNo == 1) unlockHeroTplId = 1002;
-                    else if (stageNo == 5) unlockHeroTplId = 1003;
-                    else if (stageNo == 10) unlockHeroTplId = 1004;
-                }
+                // 3. Unlock Logic (Config Driven)
+                StoryUnlockConfigTbl unlockConfig = storyUnlockConfigMapper.selectByCivAndStage(civ, stageNo);
                 
-                if (unlockHeroTplId != null) {
-                    UserGeneralTbl existingHero = userGeneralMapper.selectByUserIdAndTemplateId(session.getUserId(), unlockHeroTplId);
-                    if (existingHero == null) {
-                        GeneralTemplateTbl tpl = generalTemplateMapper.selectById(unlockHeroTplId);
-                        if (tpl != null) {
-                            UserGeneralTbl newHero = new UserGeneralTbl();
-                            newHero.setUserId(session.getUserId());
-                            newHero.setTemplateId(unlockHeroTplId);
-                            newHero.setUnlocked(true);
-                            newHero.setActivated(true);
-                            newHero.setLevel(1);
-                            newHero.setTier(0);
-                            newHero.setMaxHp(tpl.getBaseHp());
-                            newHero.setCurrentHp(tpl.getBaseHp());
-                            newHero.setCapacity(tpl.getBaseCapacity());
-                            newHero.setRestTurns(0);
-                            userGeneralMapper.insert(newHero);
+                if (unlockConfig != null) {
+                    // A. Unlock Hero
+                    if (unlockConfig.getUnlockGeneralTemplateId() != null) {
+                        Integer tplId = unlockConfig.getUnlockGeneralTemplateId();
+                        UserGeneralTbl existingHero = userGeneralMapper.selectByUserIdAndTemplateId(session.getUserId(), tplId);
+                        if (existingHero == null) {
+                            GeneralTemplateTbl tpl = generalTemplateMapper.selectById(tplId);
+                            if (tpl != null) {
+                                UserGeneralTbl newHero = new UserGeneralTbl();
+                                newHero.setUserId(session.getUserId());
+                                newHero.setTemplateId(tplId);
+                                newHero.setUnlocked(true);
+                                newHero.setActivated(true); // Auto activate reward
+                                newHero.setLevel(1);
+                                newHero.setTier(0);
+                                newHero.setMaxHp(tpl.getBaseHp());
+                                newHero.setCurrentHp(tpl.getBaseHp());
+                                newHero.setCapacity(tpl.getBaseCapacity());
+                                newHero.setRestTurns(0);
+                                userGeneralMapper.insert(newHero);
+                            }
+                        }
+                    }
+
+                    // B. Unlock Next Country
+                    if (unlockConfig.getUnlockNextCiv() != null) {
+                        String nextCiv = unlockConfig.getUnlockNextCiv();
+                        UserCivProgressTbl nextProgress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), nextCiv);
+                        if (nextProgress == null) {
+                            nextProgress = new UserCivProgressTbl();
+                            nextProgress.setUserId(session.getUserId());
+                            nextProgress.setCiv(nextCiv);
+                            nextProgress.setMaxStageCleared(0);
+                            nextProgress.setUnlocked(true);
+                            userCivProgressMapper.insert(nextProgress);
+                        } else if (!Boolean.TRUE.equals(nextProgress.getUnlocked())) {
+                            nextProgress.setUnlocked(true);
+                            userCivProgressMapper.update(nextProgress);
                         }
                     }
                 }
 
-                // 4. Unlock Next Country (Stage 10)
-                if (stageNo == 10 && "CN".equals(civ)) {
-                    String nextCiv = "JP"; 
-                    UserCivProgressTbl nextProgress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), nextCiv);
-                    if (nextProgress == null) {
-                        nextProgress = new UserCivProgressTbl();
-                        nextProgress.setUserId(session.getUserId());
-                        nextProgress.setCiv(nextCiv);
-                        nextProgress.setMaxStageCleared(0);
-                        nextProgress.setUnlocked(true);
-                        userCivProgressMapper.insert(nextProgress);
-                    } else if (!nextProgress.getUnlocked()) {
-                        nextProgress.setUnlocked(true);
-                        userCivProgressMapper.update(nextProgress);
-                    }
-                }
-
-                // 5. Handle General Injury
+                // 4. Handle General Injury
                 BattleContext.HeroState h = ctx.getAlly().getHero();
                 if (h != null) {
                     UserGeneralTbl g = userGeneralMapper.selectById(h.getGeneralId());

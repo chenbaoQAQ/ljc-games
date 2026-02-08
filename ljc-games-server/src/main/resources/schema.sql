@@ -458,3 +458,13 @@ CREATE TABLE tower_floor_config (
   enemy_config_json JSON NOT NULL,
   drop_pool_id INT NOT NULL
 ) ENGINE=InnoDB;
+
+-- 4. 剧情解锁表 (新加)
+CREATE TABLE story_unlock_config (
+  civ VARCHAR(10) NOT NULL,
+  stage_no INT NOT NULL,
+  unlock_general_template_id INT DEFAULT NULL, -- 通关奖励武将
+  unlock_next_civ VARCHAR(10) DEFAULT NULL,    -- 通关解锁国家
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (civ, stage_no)
+) ENGINE=InnoDB;

@@ -133,3 +133,117 @@ curl -X POST "http://localhost:8080/hall/gem/inlay" \
 重置数据以进行新一轮测试：
 重启服务器 (重载 `data.sql`)
 或者运行 SQL:
+
+---
+
+## 7. 四国主线验证方式
+
+### 7.1 使用test.http完整测试
+项目根目录下的 `test.http` 文件包含了四国主线(CN/JP/KR/GB)的完整测试流程。
+
+**运行方式**:
+- 使用 IntelliJ IDEA HTTP Client
+- 或使用 VSCode REST Client 插件
+
+**测试流程**:
+1. 登录admin账号
+2. 检查大厅状态(将领、进度、兵力)
+3. CN主线1-10关顺序通关
+4. JP主线1-10关顺序通关
+5. KR主线1-10关顺序通关
+6. GB主线1-10关顺序通关
+7. 最终验证（四国进度和12个奖励英雄）
+
+### 7.2 解锁链路
+四国解锁必须按以下顺序进行：
+
+```
+CN-10通关 → JP解锁 → JP-10通关 → KR解锁 → KR-10通关 → GB解锁 → GB-10通关 → 主线结束
+```
+
+**关键验证点**:
+- CN-10 胜利后: `user_civ_progress`中JP的`unlocked`变为1
+- JP-10 胜利后: `user_civ_progress`中KR的`unlocked`变为1
+- KR-10 胜利后: `user_civ_progress`中GB的`unlocked`变为1
+- GB-10 胜利后: 主线完成，无新国家解锁
+
+### 7.3 奖励英雄解锁
+每个国家在1/5/10关通关后会自动解锁对应英雄：
+
+| 国家 | 第1关 | 第5关 | 第10关 |
+|------|-------|-------|--------|
+| CN   | 1002  | 1003  | 1004   |
+| JP   | 2001  | 2002  | 2003   |
+| KR   | 2201  | 2202  | 2203   |
+| GB   | 2301  | 2302  | 2303   |
+
+完成四国主线后，`user_generals`表应包含13个将领（初始1个+奖励12个）。
+
+---
+
+## 8. 数据一致性校验
+
+服务启动时会自动执行`DataIntegrityChecker`进行数据完整性检查：
+
+**校验内容**:
+1. ✅ 四国每国都有1-10关的配置（共40关）
+2. ✅ 解锁配置中指向的关卡存在
+3. ✅ 解锁配置中指向的英雄模板存在
+4. ✅ 关卡使用的掉落池配置存在
+
+**如果校验失败**:
+- 服务启动会终止
+- 控制台会输出详细的错误信息
+- 需要修复`data.sql`中的数据配置
+
+---
+
+---
+
+## 9. 如何运行四国主线自测脚本
+
+### 9.1 前置条件（必须）
+```bash
+# 1. 创建数据库表结构
+mysql -u root -p ljc_game < src/main/resources/schema.sql
+
+# 2. 初始化基础数据（包含admin测试号）
+mysql -u root -p ljc_game < src/main/resources/data.sql
+
+# 3. 启动后端服务
+./mvnw spring-boot:run
+# 或在IDEA中直接运行LjcGamesApplication
+```
+
+### 9.2 使用test_story_4civ.http
+**文件路径**: `/test_story_4civ.http`
+
+**运行方式**:
+- **IDEA**: 打开文件，点击每个请求左侧的绿色▶️按钮
+- **VSCode**: 安装REST Client插件，点击"Send Request"
+
+**操作流程**:
+1. 执行"登录admin账号"请求
+2. 执行"查询玩家信息"请求
+3. **按顺序**执行CN-1到CN-10（每关的turn请求重复执行直到WIN）
+4. 执行"验证：CN通关后JP已解锁"，确认JP的unlocked=1
+5. 重复3-4步骤完成JP/KR/GB
+
+### 9.3 关键注意事项
+⚠️ **不能跳关**: 必须按1→2→3...→10顺序执行
+⚠️ **重复turn**: 每关的turn请求需要多次执行直到battleStatus=WIN
+⚠️ **顺序解锁**: 四国必须按CN→JP→KR→GB顺序解锁
+
+### 9.4 验收标准
+四国主线全部通关后，应满足：
+```sql
+-- 1. 四国全部解锁且通关
+SELECT civ, unlocked, max_stage_cleared FROM user_civ_progress WHERE user_id=1;
+-- 期望: CN/JP/KR/GB的unlocked都为1, max_stage_cleared都为10
+
+-- 2. 12个奖励英雄全部解锁
+SELECT COUNT(*) FROM user_generals WHERE user_id=1;
+-- 期望: 13 (初始1个 + 奖励12个)
+```
+
+---

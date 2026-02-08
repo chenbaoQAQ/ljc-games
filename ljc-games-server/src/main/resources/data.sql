@@ -14,6 +14,18 @@ DELETE FROM general_template;
 DELETE FROM troop_template;
 DELETE FROM skill_template;
 DELETE FROM personality_config;
+DELETE FROM user_civ_progress;
+DELETE FROM user_troops;
+DELETE FROM story_unlock_config;
+DELETE FROM drop_pool;
+
+-- 0.5 插入掉落池 (必须先于关卡配置)
+INSERT INTO drop_pool (pool_id, entries_json) VALUES
+(1, '[{"type":"GOLD","min":100,"max":200,"weight":100}]'),
+(2, '[{"type":"GOLD","min":200,"max":400,"weight":100}]'),
+(3, '[{"type":"GOLD","min":400,"max":700,"weight":100}]'),
+(4, '[{"type":"GOLD","min":700,"max":1200,"weight":100}]'),
+(5, '[{"type":"GOLD","min":1200,"max":2000,"weight":100}]');
 
 -- 1. 先插入性格 (否则插武将会报错外键错误)
 INSERT INTO personality_config (personality_code, display_name, deal_mult, taken_mult, rescue_rate_bonus, last_stand_bias, roll_bias, roll_variance_scale, note) VALUES
@@ -29,7 +41,20 @@ INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, bas
     (1001, 'CN', '义勇兵', 'INF', 0, 1, 10, 50, 10, 0),
     (2001, 'CN', '步兵', 'INF', 0, 1, 15, 60, 20, 0),
     (2002, 'CN', '弓兵', 'ARC', 0, 1, 20, 40, 20, 0),
-    (2003, 'CN', '骑兵', 'CAV', 0, 2, 25, 80, 40, 0);
+    (2003, 'CN', '骑兵', 'CAV', 0, 2, 25, 80, 40, 0),
+    -- JP troops
+    (2101, 'JP', '足轻', 'INF', 0, 1, 15, 60, 20, 0),
+    (2102, 'JP', '弓足轻', 'ARC', 0, 1, 20, 40, 20, 0),
+    (2103, 'JP', '骑马武者', 'CAV', 0, 2, 25, 80, 40, 0),
+    -- KR troops
+    (2201, 'KR', '步卒', 'INF', 0, 1, 15, 60, 20, 0),
+    (2202, 'KR', '弓手', 'ARC', 0, 1, 20, 40, 20, 0),
+    (2203, 'KR', '骑卒', 'CAV', 0, 2, 25, 80, 40, 0),
+    -- GB troops
+    (2301, 'GB', 'Footman', 'INF', 0, 1, 15, 60, 20, 0),
+    (2302, 'GB', 'Archer', 'ARC', 0, 1, 20, 40, 20, 0),
+    (2303, 'GB', 'Cavalry', 'CAV', 0, 2, 25, 80, 40, 0);
+
 
 -- 4. 插入初始武将 (关键！ID=1001)
 INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
@@ -78,6 +103,20 @@ INSERT INTO skill_book_map (item_id, skill_id) VALUES (301, 1);
 INSERT INTO user_inventory (user_id, item_id, count) VALUES
     (1, 301, 10); -- 10本技能书
 
+-- 8.5 初始化四国进度 (CN已解锁,其他未解锁)
+INSERT INTO user_civ_progress (user_id, civ, unlocked, max_stage_cleared) VALUES
+(1, 'CN', 1, 0),
+(1, 'JP', 0, 0),
+(1, 'KR', 0, 0),
+(1, 'GB', 0, 0);
+
+-- 8.6 初始兵力 (四国全兵种，方便测试)
+INSERT INTO user_troops (user_id, troop_id, count) VALUES
+(1, 2001, 9999), (1, 2002, 9999), (1, 2003, 9999),
+(1, 2101, 9999), (1, 2102, 9999), (1, 2103, 9999),
+(1, 2201, 9999), (1, 2202, 9999), (1, 2203, 9999),
+(1, 2301, 9999), (1, 2302, 9999), (1, 2303, 9999);
+
 -- 9. 故事模式关卡配置 (CN 1-10)
 -- 简单起见，所有关卡敌人配置类似，只是属性倍率不同
 -- enemy_config_json 包含 hero 和 troops
@@ -95,4 +134,84 @@ INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, ene
 ('CN', 10,'BOSS',   0,  2500, 5, '{"hero":{"name":"吕布","maxHp":10000,"currentHp":10000,"atk":300,"speed":100,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":100,"unitHp":50,"frontHp":50}]}');
 
 
+-- CN unlock config
+INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
+('CN', 1, 1002, NULL),
+('CN', 5, 1003, NULL),
+('CN', 10, 1004, 'JP');
+
+INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
+('JP', 1, 2001, NULL),
+('JP', 5, 2002, NULL),
+('JP', 10, 2003, 'KR');
+
+
+INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
+    (2001, 'JP', 'JP_H1', 50, 500, 5, 50, 'STOIC', 0, 10, 1),
+    (2002, 'JP', 'JP_H2', 60, 600, 5, 45, 'BERSERKER', 1000, 10, 1),
+    (2003, 'JP', 'JP_H3', 100, 1000, 8, 80, 'BERSERKER', 0, 10, 1),
+    -- KR heroes
+    (2201, 'KR', 'KR_H1', 50, 500, 5, 50, 'STOIC', 0, 10, 1),
+    (2202, 'KR', 'KR_H2', 60, 600, 5, 45, 'BERSERKER', 1000, 10, 1),
+    (2203, 'KR', 'KR_H3', 100, 1000, 8, 80, 'BERSERKER', 0, 10, 1);
+
+
+INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, enemy_multiplier, drop_pool_id, enemy_config_json) VALUES
+('JP', 1, 'NORMAL', 0, 1000, 1, '{"hero":{"name":"浪人","maxHp":1000,"currentHp":1000,"atk":50,"speed":40,"personality":"STOIC"},"troops":[{"troopId":2101,"type":"INF","count":12,"unitHp":20,"frontHp":20}]}'),
+('JP', 2, 'NORMAL', 0, 1100, 1, '{"hero":{"name":"弓队头","maxHp":1200,"currentHp":1200,"atk":55,"speed":45,"personality":"STOIC"},"troops":[{"troopId":2102,"type":"ARC","count":14,"unitHp":15,"frontHp":15}]}'),
+('JP', 3, 'NORMAL', 0, 1200, 1, '{"hero":{"name":"骑马武者","maxHp":1400,"currentHp":1400,"atk":60,"speed":55,"personality":"BERSERKER"},"troops":[{"troopId":2103,"type":"CAV","count":10,"unitHp":30,"frontHp":30}]}'),
+('JP', 4, 'NORMAL', 0, 1300, 1, '{"hero":{"name":"侍从","maxHp":1600,"currentHp":1600,"atk":70,"speed":50,"personality":"STOIC"},"troops":[{"troopId":2101,"type":"INF","count":18,"unitHp":20,"frontHp":20},{"troopId":2102,"type":"ARC","count":12,"unitHp":15,"frontHp":15}]}'),
+('JP', 5, 'WALL', 50, 1500, 2, '{"hero":{"name":"城门番","maxHp":3000,"currentHp":3000,"atk":80,"speed":30,"personality":"STOIC"},"troops":[{"troopId":2102,"type":"ARC","count":55,"unitHp":20,"frontHp":20}]}'),
+('JP', 6, 'NORMAL', 0, 1600, 2, '{"hero":{"name":"旗本","maxHp":2200,"currentHp":2200,"atk":90,"speed":70,"personality":"BERSERKER"},"troops":[{"troopId":2102,"type":"ARC","count":20,"unitHp":18,"frontHp":18},{"troopId":2103,"type":"CAV","count":14,"unitHp":30,"frontHp":30}]}'),
+('JP', 7, 'NORMAL', 0, 1700, 2, '{"hero":{"name":"武家小队长","maxHp":2500,"currentHp":2500,"atk":95,"speed":60,"personality":"BERSERKER"},"troops":[{"troopId":2101,"type":"INF","count":30,"unitHp":22,"frontHp":22},{"troopId":2103,"type":"CAV","count":12,"unitHp":32,"frontHp":32}]}'),
+('JP', 8, 'NORMAL', 0, 1800, 2, '{"hero":{"name":"家臣","maxHp":3000,"currentHp":3000,"atk":100,"speed":55,"personality":"STOIC"},"troops":[{"troopId":2101,"type":"INF","count":28,"unitHp":25,"frontHp":25},{"troopId":2102,"type":"ARC","count":24,"unitHp":18,"frontHp":18},{"troopId":2103,"type":"CAV","count":14,"unitHp":35,"frontHp":35}]}'),
+('JP', 9, 'WALL', 100, 2000, 3, '{"hero":{"name":"大将亲卫","maxHp":5000,"currentHp":5000,"atk":150,"speed":75,"personality":"BERSERKER"},"troops":[{"troopId":2103,"type":"CAV","count":60,"unitHp":40,"frontHp":40}]}'),
+('JP', 10, 'BOSS', 0, 2500, 5, '{"hero":{"name":"幕府猛将","maxHp":10000,"currentHp":10000,"atk":300,"speed":100,"personality":"BERSERKER"},"troops":[{"troopId":2103,"type":"CAV","count":110,"unitHp":50,"frontHp":50},{"troopId":2102,"type":"ARC","count":80,"unitHp":20,"frontHp":20}]}');
+
+
+-- KR 1-10 story stages
+INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, enemy_multiplier, drop_pool_id, enemy_config_json) VALUES
+('KR', 1, 'NORMAL', 0, 1000, 1, '{"hero":{"name":"义军","maxHp":1000,"currentHp":1000,"atk":50,"speed":40,"personality":"STOIC"},"troops":[{"troopId":2201,"type":"INF","count":12,"unitHp":20,"frontHp":20}]}'),
+('KR', 2, 'NORMAL', 0, 1100, 1, '{"hero":{"name":"弓队长","maxHp":1200,"currentHp":1200,"atk":55,"speed":45,"personality":"STOIC"},"troops":[{"troopId":2202,"type":"ARC","count":14,"unitHp":15,"frontHp":15}]}'),
+('KR', 3, 'NORMAL', 0, 1200, 1, '{"hero":{"name":"骑队头","maxHp":1400,"currentHp":1400,"atk":60,"speed":55,"personality":"BERSERKER"},"troops":[{"troopId":2203,"type":"CAV","count":10,"unitHp":30,"frontHp":30}]}'),
+('KR', 4, 'NORMAL', 0, 1300, 1, '{"hero":{"name":"前锋","maxHp":1600,"currentHp":1600,"atk":70,"speed":50,"personality":"STOIC"},"troops":[{"troopId":2201,"type":"INF","count":18,"unitHp":20,"frontHp":20},{"troopId":2202,"type":"ARC","count":12,"unitHp":15,"frontHp":15}]}'),
+('KR', 5, 'WALL', 50, 1500, 2, '{"hero":{"name":"城门守军","maxHp":3000,"currentHp":3000,"atk":80,"speed":30,"personality":"STOIC"},"troops":[{"troopId":2202,"type":"ARC","count":55,"unitHp":20,"frontHp":20}]}'),
+('KR', 6, 'NORMAL', 0, 1600, 2, '{"hero":{"name":"精锐","maxHp":2200,"currentHp":2200,"atk":90,"speed":70,"personality":"BERSERKER"},"troops":[{"troopId":2202,"type":"ARC","count":20,"unitHp":18,"frontHp":18},{"troopId":2203,"type":"CAV","count":14,"unitHp":30,"frontHp":30}]}'),
+('KR', 7, 'NORMAL', 0, 1700, 2, '{"hero":{"name":"骑军统领","maxHp":2500,"currentHp":2500,"atk":95,"speed":60,"personality":"BERSERKER"},"troops":[{"troopId":2201,"type":"INF","count":30,"unitHp":22,"frontHp":22},{"troopId":2203,"type":"CAV","count":12,"unitHp":32,"frontHp":32}]}'),
+('KR', 8, 'NORMAL', 0, 1800, 2, '{"hero":{"name":"护卫","maxHp":3000,"currentHp":3000,"atk":100,"speed":55,"personality":"STOIC"},"troops":[{"troopId":2201,"type":"INF","count":28,"unitHp":25,"frontHp":25},{"troopId":2202,"type":"ARC","count":24,"unitHp":18,"frontHp":18},{"troopId":2203,"type":"CAV","count":14,"unitHp":35,"frontHp":35}]}'),
+('KR', 9, 'WALL', 100, 2000, 3, '{"hero":{"name":"亲卫统领","maxHp":5000,"currentHp":5000,"atk":150,"speed":75,"personality":"BERSERKER"},"troops":[{"troopId":2203,"type":"CAV","count":60,"unitHp":40,"frontHp":40}]}'),
+('KR', 10, 'BOSS', 0, 2500, 5, '{"hero":{"name":"大将军","maxHp":10000,"currentHp":10000,"atk":300,"speed":100,"personality":"BERSERKER"},"troops":[{"troopId":2203,"type":"CAV","count":110,"unitHp":50,"frontHp":50},{"troopId":2202,"type":"ARC","count":80,"unitHp":20,"frontHp":20}]}');
+
+-- GB heroes
+INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
+    (2301, 'GB', 'GB_H1', 50, 500, 5, 50, 'STOIC', 0, 10, 1),
+    (2302, 'GB', 'GB_H2', 60, 600, 5, 45, 'BERSERKER', 1000, 10, 1),
+    (2303, 'GB', 'GB_H3', 100, 1000, 8, 80, 'BERSERKER', 0, 10, 1);
+
+-- GB 1-10 story stages
+INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, enemy_multiplier, drop_pool_id, enemy_config_json) VALUES
+('GB', 1, 'NORMAL', 0, 1000, 1, '{"hero":{"name":"Militia Captain","maxHp":1000,"currentHp":1000,"atk":50,"speed":40,"personality":"STOIC"},"troops":[{"troopId":2301,"type":"INF","count":12,"unitHp":20,"frontHp":20}]}'),
+('GB', 2, 'NORMAL', 0, 1100, 1, '{"hero":{"name":"Bow Sergeant","maxHp":1200,"currentHp":1200,"atk":55,"speed":45,"personality":"STOIC"},"troops":[{"troopId":2302,"type":"ARC","count":14,"unitHp":15,"frontHp":15}]}'),
+('GB', 3, 'NORMAL', 0, 1200, 1, '{"hero":{"name":"Knight","maxHp":1400,"currentHp":1400,"atk":60,"speed":55,"personality":"BERSERKER"},"troops":[{"troopId":2303,"type":"CAV","count":10,"unitHp":30,"frontHp":30}]}'),
+('GB', 4, 'NORMAL', 0, 1300, 1, '{"hero":{"name":"Vanguard","maxHp":1600,"currentHp":1600,"atk":70,"speed":50,"personality":"STOIC"},"troops":[{"troopId":2301,"type":"INF","count":18,"unitHp":20,"frontHp":20},{"troopId":2302,"type":"ARC","count":12,"unitHp":15,"frontHp":15}]}'),
+('GB', 5, 'WALL', 50, 1500, 2, '{"hero":{"name":"Gate Warden","maxHp":3000,"currentHp":3000,"atk":80,"speed":30,"personality":"STOIC"},"troops":[{"troopId":2302,"type":"ARC","count":55,"unitHp":20,"frontHp":20}]}'),
+('GB', 6, 'NORMAL', 0, 1600, 2, '{"hero":{"name":"Ranger","maxHp":2200,"currentHp":2200,"atk":90,"speed":70,"personality":"BERSERKER"},"troops":[{"troopId":2302,"type":"ARC","count":20,"unitHp":18,"frontHp":18},{"troopId":2303,"type":"CAV","count":14,"unitHp":30,"frontHp":30}]}'),
+('GB', 7, 'NORMAL', 0, 1700, 2, '{"hero":{"name":"Knight Commander","maxHp":2500,"currentHp":2500,"atk":95,"speed":60,"personality":"BERSERKER"},"troops":[{"troopId":2301,"type":"INF","count":30,"unitHp":22,"frontHp":22},{"troopId":2303,"type":"CAV","count":12,"unitHp":32,"frontHp":32}]}'),
+('GB', 8, 'NORMAL', 0, 1800, 2, '{"hero":{"name":"Royal Guard","maxHp":3000,"currentHp":3000,"atk":100,"speed":55,"personality":"STOIC"},"troops":[{"troopId":2301,"type":"INF","count":28,"unitHp":25,"frontHp":25},{"troopId":2302,"type":"ARC","count":24,"unitHp":18,"frontHp":18},{"troopId":2303,"type":"CAV","count":14,"unitHp":35,"frontHp":35}]}'),
+('GB', 9, 'WALL', 100, 2000, 3, '{"hero":{"name":"Castle Guard","maxHp":5000,"currentHp":5000,"atk":150,"speed":75,"personality":"BERSERKER"},"troops":[{"troopId":2303,"type":"CAV","count":60,"unitHp":40,"frontHp":40}]}'),
+('GB', 10, 'BOSS', 0, 2500, 5, '{"hero":{"name":"Warlord","maxHp":10000,"currentHp":10000,"atk":300,"speed":100,"personality":"BERSERKER"},"troops":[{"troopId":2303,"type":"CAV","count":110,"unitHp":50,"frontHp":50},{"troopId":2302,"type":"ARC","count":80,"unitHp":20,"frontHp":20}]}');
+
+-- KR unlock config
+INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
+('KR', 1, 2201, NULL),
+('KR', 5, 2202, NULL),
+('KR', 10, 2203, 'GB');
+
+-- GB unlock config
+INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
+('GB', 1, 2301, NULL),
+('GB', 5, 2302, NULL),
+('GB', 10, 2303, NULL);
+
+-- 重新启用外键检查
 SET FOREIGN_KEY_CHECKS = 1;
