@@ -1,5 +1,6 @@
 package ljc.controller;
 
+import ljc.common.Result;
 import ljc.controller.dto.LoginReq;
 import ljc.controller.dto.RegisterReq;
 import ljc.entity.UserTbl;
@@ -19,25 +20,26 @@ public class AuthController {
      * URL: POST /auth/register
      */
     @PostMapping("/register")
-    public String register(@RequestBody RegisterReq req) {
-        // 调用 Service
-        UserTbl user = authService.register(req);
-
-        // 返回简单结果 (以后我们会封装统一的 Result)
-        return "注册成功！玩家ID: " + user.getId() + "，主公：" + user.getNickname();
+    public Result<UserTbl> register(@RequestBody RegisterReq req) {
+        try {
+            UserTbl user = authService.register(req);
+            return Result.success(user);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
     }
+
     /**
      * 登录接口
      * URL: POST /auth/login
      */
     @PostMapping("/login")
-    public String login(@RequestBody LoginReq req) {
-
-        // 1. 调用 authService 的 login 方法，把结果存入变量 user
-        UserTbl user = authService.login(req);
-        // 2. 返回一句成功的字符串
-        return "登录成功！欢迎回来，" + user.getNickname();
-
-        // ----------------------------------------------------
+    public Result<UserTbl> login(@RequestBody LoginReq req) {
+        try {
+            UserTbl user = authService.login(req);
+            return Result.success(user);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
     }
 }

@@ -1,9 +1,0 @@
-<view class="container" style="padding: 20px;">
-  <view style="background: #f4f4f4; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-    <view style="margin-bottom: 10px;">💰 金币: {{gold}}</view>
-    <view>💎 钻石: {{diamond}}</view>
-  </view>
-  <button type="primary" bindtap="goToGacha">进入点将台</button>
-  <button style="margin-top: 10px;" bindtap="startBattle">开始闯关</button>
-  <button type="default" style="margin-top: 10px;" bindtap="goToBarracks">前往兵营</button>
-</view>
