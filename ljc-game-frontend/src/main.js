@@ -2,11 +2,13 @@ import { router } from './utils/router.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { HallPage } from './pages/HallPage.js';
 import { RecruitPage } from './pages/RecruitPage.js';
+import { GeneralsPage } from './pages/GeneralsPage.js';
 
 // 注册路由
 router.register('/login', LoginPage);
 router.register('/hall', HallPage);
 router.register('/recruit', RecruitPage);
+router.register('/generals', GeneralsPage);
 
 // 初始化应用
 function init() {

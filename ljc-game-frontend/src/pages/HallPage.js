@@ -424,7 +424,7 @@ export function HallPage(container) {
   });
 
   document.getElementById('manage-generals-btn').addEventListener('click', () => {
-    alert('武将管理功能开发中...');
+    router.navigate('/generals');
   });
 
   document.getElementById('recruit-btn').addEventListener('click', () => {
