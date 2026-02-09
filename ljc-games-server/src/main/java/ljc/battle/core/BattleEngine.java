@@ -138,6 +138,9 @@ public class BattleEngine {
         // 1. Check Stun
         if (isActorStunned(state, actor)) {
              result.logEvents.add(new BattleLogEvent(Type.STUN_SKIP, actorId, null, 0, "Stunned, Turn Skipped"));
+             
+             // Consume Stun Here (Duration logic moved from Round End)
+             consumeStun(state, actor);
              return; 
         }
 
@@ -450,6 +453,21 @@ public class BattleEngine {
         Map<String, List<StatusEffect>> map = (side == state.sideA) ? state.statusesA : state.statusesB;
         if (!map.containsKey(key)) return false;
         return map.get(key).stream().anyMatch(s -> s.type == type);
+    }
+
+    private void consumeStun(BattleState state, Actor actor) {
+        if (!actor.isHero) return;
+        Map<String, List<StatusEffect>> map = (actor.side == state.sideA) ? state.statusesA : state.statusesB;
+        List<StatusEffect> list = map.get("Hero");
+        if (list != null) {
+            list.removeIf(e -> {
+                 if (e.type == StatusEffect.StatusType.STUN) {
+                     e.remainingTurns--;
+                     return e.remainingTurns <= 0;
+                 }
+                 return false;
+            });
+        }
     }
 
     private boolean isOppositeGender(Hero h1, Hero h2) {

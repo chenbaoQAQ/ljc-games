@@ -87,6 +87,9 @@ public class StatusLogic {
     private static void decreaseSideDurations(Map<String, List<StatusEffect>> map) {
         for (List<StatusEffect> list : map.values()) {
             list.removeIf(e -> {
+                // STUN consumed on trigger, not round end
+                if (e.type == StatusEffect.StatusType.STUN) return false;
+                
                 e.remainingTurns--;
                 return e.remainingTurns <= 0;
             });

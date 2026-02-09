@@ -49,7 +49,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 1. 用户与进度
 -- =========================================================
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(64) NOT NULL UNIQUE,
   password_hash VARCHAR(128) NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE users (
   INDEX idx_users_created (created_at)
 ) ENGINE=InnoDB;
 
-CREATE TABLE user_civ_progress (
+CREATE TABLE IF NOT EXISTS user_civ_progress (
   user_id BIGINT NOT NULL,
   civ VARCHAR(10) NOT NULL,
   unlocked BOOLEAN NOT NULL DEFAULT FALSE,
@@ -75,7 +75,7 @@ CREATE TABLE user_civ_progress (
   INDEX idx_ucp_user (user_id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE user_tower_progress (
+CREATE TABLE IF NOT EXISTS user_tower_progress (
   user_id BIGINT PRIMARY KEY,
   unlocked BOOLEAN NOT NULL DEFAULT FALSE,
   max_floor_cleared INT NOT NULL DEFAULT 0,
@@ -83,7 +83,7 @@ CREATE TABLE user_tower_progress (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-CREATE TABLE user_flags (
+CREATE TABLE IF NOT EXISTS user_flags (
   user_id BIGINT PRIMARY KEY,
   ascension_token_used BOOLEAN NOT NULL DEFAULT FALSE,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -93,7 +93,7 @@ CREATE TABLE user_flags (
 -- 2. 资产：兵、武将、装备、宝石、背包
 -- =========================================================
 
-CREATE TABLE user_troops (
+CREATE TABLE IF NOT EXISTS user_troops (
   user_id BIGINT NOT NULL,
   troop_id INT NOT NULL,
   count BIGINT NOT NULL DEFAULT 0,
@@ -103,7 +103,7 @@ CREATE TABLE user_troops (
   INDEX idx_ut_troop (troop_id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE user_generals (
+CREATE TABLE IF NOT EXISTS user_generals (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
   template_id INT NOT NULL,
@@ -126,7 +126,7 @@ CREATE TABLE user_generals (
   INDEX idx_ug_user_tpl (user_id, template_id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE user_equipments (
+CREATE TABLE IF NOT EXISTS user_equipments (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
   template_id INT NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE user_equipments (
   INDEX idx_ue_tpl (template_id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE user_gems (
+CREATE TABLE IF NOT EXISTS user_gems (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
 
@@ -162,7 +162,7 @@ CREATE TABLE user_gems (
   INDEX idx_ugem_query (user_id, gem_type, gem_level, is_used)
 ) ENGINE=InnoDB;
 
-CREATE TABLE user_inventory (
+CREATE TABLE IF NOT EXISTS user_inventory (
   user_id BIGINT NOT NULL,
   item_id INT NOT NULL,
   count BIGINT NOT NULL DEFAULT 0,
@@ -177,7 +177,7 @@ CREATE TABLE user_inventory (
 -- =========================================================
 
 -- 进行中会话：一个玩家同一时刻只允许 1 场进行中的战斗（符合你的游戏）
-CREATE TABLE battle_sessions (
+CREATE TABLE IF NOT EXISTS battle_sessions (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
 
@@ -197,7 +197,7 @@ CREATE TABLE battle_sessions (
 
 
 -- 可选：如果你希望未来复盘每回合事件（本期不强制实现）
-CREATE TABLE battle_turn_log (
+CREATE TABLE IF NOT EXISTS battle_turn_log (
   battle_id BIGINT NOT NULL,
   turn_no INT NOT NULL,
   events_json JSON NOT NULL,      -- 本回合事件（技能释放/roll/伤害/撤退等）
@@ -206,7 +206,7 @@ CREATE TABLE battle_turn_log (
 ) ENGINE=InnoDB;
 
 -- 结束归档：只在战斗结束写一次
-CREATE TABLE battle_log (
+CREATE TABLE IF NOT EXISTS battle_log (
   battle_id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
 
@@ -234,7 +234,7 @@ CREATE TABLE battle_log (
 -- 4. 台账：金币/钻石、兵力变化、合成记录
 -- =========================================================
 
-CREATE TABLE currency_ledger (
+CREATE TABLE IF NOT EXISTS currency_ledger (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
 
@@ -251,7 +251,7 @@ CREATE TABLE currency_ledger (
   INDEX idx_cur_reason (reason)
 ) ENGINE=InnoDB;
 
-CREATE TABLE troop_ledger (
+CREATE TABLE IF NOT EXISTS troop_ledger (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
   troop_id INT NOT NULL,
@@ -269,7 +269,7 @@ CREATE TABLE troop_ledger (
 ) ENGINE=InnoDB;
 
 -- 设计图合成：成功率在 blueprint_template
-CREATE TABLE craft_history (
+CREATE TABLE IF NOT EXISTS craft_history (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
 
@@ -287,7 +287,7 @@ CREATE TABLE craft_history (
 -- 5. 技能系统（主动/被动 + CD 回合 + 技能书覆盖）
 -- =========================================================
 
-CREATE TABLE skill_template (
+CREATE TABLE IF NOT EXISTS skill_template (
   skill_id INT PRIMARY KEY,
   name VARCHAR(32) NOT NULL,
   description VARCHAR(255) NOT NULL,
@@ -302,18 +302,18 @@ CREATE TABLE skill_template (
 ) ENGINE=InnoDB;
 
 -- 每个武将只有一个技能槽：学习技能书会覆盖 old -> new
-CREATE TABLE user_general_skill (
+CREATE TABLE IF NOT EXISTS user_general_skill (
   general_id BIGINT PRIMARY KEY,
   current_skill_id INT NOT NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-CREATE TABLE skill_book_map (
+CREATE TABLE IF NOT EXISTS skill_book_map (
   item_id INT PRIMARY KEY,   -- 背包道具id（技能书）
   skill_id INT NOT NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE skill_learn_log (
+CREATE TABLE IF NOT EXISTS skill_learn_log (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
   general_id BIGINT NOT NULL,
@@ -328,7 +328,7 @@ CREATE TABLE skill_learn_log (
 -- 6. 配置表（策划表：只读）
 -- =========================================================
 
-CREATE TABLE personality_config (
+CREATE TABLE IF NOT EXISTS personality_config (
   personality_code VARCHAR(20) PRIMARY KEY,
   display_name VARCHAR(32) NOT NULL,
 
@@ -349,7 +349,7 @@ CREATE TABLE personality_config (
   note VARCHAR(255) DEFAULT NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE general_template (
+CREATE TABLE IF NOT EXISTS general_template (
   template_id INT PRIMARY KEY,
   civ VARCHAR(10) NOT NULL,
   name VARCHAR(32) NOT NULL,
@@ -374,7 +374,7 @@ CREATE TABLE general_template (
   INDEX idx_gt_personality (personality_code)
 ) ENGINE=InnoDB;
 
-CREATE TABLE troop_template (
+CREATE TABLE IF NOT EXISTS troop_template (
   troop_id INT PRIMARY KEY,
   civ VARCHAR(10) NOT NULL,
   name VARCHAR(32) NOT NULL,
@@ -393,7 +393,7 @@ CREATE TABLE troop_template (
   INDEX idx_tt_type (troop_type)
 ) ENGINE=InnoDB;
 
-CREATE TABLE equipment_template (
+CREATE TABLE IF NOT EXISTS equipment_template (
   template_id INT PRIMARY KEY,
   slot VARCHAR(12) NOT NULL,                -- WEAPON/ARMOR/SHOES/FLAG/TALISMAN
   name VARCHAR(32) NOT NULL,
@@ -416,7 +416,7 @@ CREATE TABLE equipment_template (
   INDEX idx_et_slot (slot)
 ) ENGINE=InnoDB;
 
-CREATE TABLE gem_template (
+CREATE TABLE IF NOT EXISTS gem_template (
   gem_type VARCHAR(10) NOT NULL,
   gem_level INT NOT NULL,
   stat_value BIGINT NOT NULL,
@@ -424,7 +424,7 @@ CREATE TABLE gem_template (
 ) ENGINE=InnoDB;
 
 -- blueprint_item_id：背包中的“设计图道具id”
-CREATE TABLE blueprint_template (
+CREATE TABLE IF NOT EXISTS blueprint_template (
   blueprint_item_id INT PRIMARY KEY,
   equipment_template_id INT NOT NULL,
   success_rate INT NOT NULL,                -- 0~10000（建议万分比）或 0~100（百分比），你自行定口径
@@ -432,7 +432,7 @@ CREATE TABLE blueprint_template (
   materials_json JSON NOT NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE story_stage_config (
+CREATE TABLE IF NOT EXISTS story_stage_config (
   civ VARCHAR(10) NOT NULL,
   stage_no INT NOT NULL,
   stage_type VARCHAR(10) NOT NULL,          -- NORMAL/WALL/BOSS
@@ -445,12 +445,12 @@ CREATE TABLE story_stage_config (
   PRIMARY KEY (civ, stage_no)
 ) ENGINE=InnoDB;
 
-CREATE TABLE drop_pool (
+CREATE TABLE IF NOT EXISTS drop_pool (
   pool_id INT PRIMARY KEY,
   entries_json JSON NOT NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE tower_floor_config (
+CREATE TABLE IF NOT EXISTS tower_floor_config (
   floor_no INT PRIMARY KEY,
   floor_type VARCHAR(10) NOT NULL,
   enemy_multiplier INT NOT NULL DEFAULT 1000,
@@ -460,7 +460,7 @@ CREATE TABLE tower_floor_config (
 ) ENGINE=InnoDB;
 
 -- 4. 剧情解锁表 (新加)
-CREATE TABLE story_unlock_config (
+CREATE TABLE IF NOT EXISTS story_unlock_config (
   civ VARCHAR(10) NOT NULL,
   stage_no INT NOT NULL,
   unlock_general_template_id INT DEFAULT NULL, -- 通关奖励武将

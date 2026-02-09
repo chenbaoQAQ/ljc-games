@@ -13,6 +13,11 @@ public class BattleContext {
     private Long battleId;
     private Long randomSeed; // For deterministic replay
     
+    // 战斗进度
+    private Integer currentTurn;
+    private boolean finished;
+    private boolean win;
+    
     // Environment
     private Integer turnLimit = 20;
     private List<String> logs = new ArrayList<>();

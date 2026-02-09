@@ -1,195 +1,23 @@
 package ljc.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ljc.context.BattleContext;
-import ljc.entity.*;
-import ljc.entity.BattleSessionTbl;
+import ljc.battle.core.*;
+import ljc.context.*; // BattleContext, etc
+import ljc.entity.*; // UserGeneralTbl, etc
 import ljc.mapper.*;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.stereotype.Service;
-import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class BattleService {
-    public Long startStoryBattle(Long userId, String civ, Integer stageNo, Long generalId, Map<Integer, Integer> troopConfig) {
-        // 1. Check existing session
-        BattleSessionTbl existing = battleSessionMapper.selectByUserId(userId);
-        if (existing != null && existing.getStatus() == 0) {
-            throw new RuntimeException("Wait, you are already in a battle!");
-        }
-
-        // 2. Validate General & Load
-        if (generalId == null) throw new RuntimeException("Must select a general!");
-        UserGeneralTbl general = userGeneralMapper.selectById(generalId);
-        if (general == null || !general.getUserId().equals(userId)) {
-            throw new RuntimeException("General not found");
-        }
-        if (!Boolean.TRUE.equals(general.getActivated())) {
-            throw new RuntimeException("General not activated");
-        }
-        if (general.getRestTurns() != null && general.getRestTurns() > 0) {
-            throw new RuntimeException("General is resting (" + general.getRestTurns() + " turns left)");
-        }
-
-        // 3. User & Progress Validation
-        UserCivProgressTbl progress = userCivProgressMapper.selectByUserIdAndCiv(userId, civ);
-        if (progress == null || !Boolean.TRUE.equals(progress.getUnlocked())) {
-             throw new RuntimeException("Civilization not unlocked: " + civ);
-        }
-
-        int currentMax = (progress.getMaxStageCleared() == null ? 0 : progress.getMaxStageCleared());
-        if (stageNo > currentMax + 1) {
-            throw new RuntimeException("Stage locked! Please clear previous stages first.");
-        }
-
-        // 4. Load Stage Config
-        StoryStageConfigTbl stageConfig = storyStageConfigMapper.selectByCivAndStage(civ, stageNo);
-        if (stageConfig == null) {
-            throw new RuntimeException("Stage config not found: " + civ + "-" + stageNo);
-        }
-
-        // 5. Capacity Check & Prepare Troops
-        int totalSpace = 0;
-        List<BattleContext.TroopStack> battleStacks = new ArrayList<>();
-
-        // This map tracks actual deducted amount from inventory (Config amount)
-        // Battle amount might be lower due to Wall Cost
-
-        // We need to load Troop Templates first to calculate capacity and type
-        // Let's iterate troopConfig
-        if (troopConfig != null) {
-            for (Map.Entry<Integer, Integer> entry : troopConfig.entrySet()) {
-                Integer count = entry.getValue();
-                if (count <= 0) continue;
-
-                TroopTemplateTbl tpl = troopTemplateMapper.selectById(entry.getKey());
-                if (tpl == null) continue;
-
-                totalSpace += count * (tpl.getCost() == null ? 1 : tpl.getCost());
-
-                BattleContext.TroopStack stack = new BattleContext.TroopStack();
-                stack.setTroopId(entry.getKey());
-                stack.setType(tpl.getTroopType());
-                stack.setCount(Long.valueOf(count));
-                stack.setUnitHp(tpl.getBaseHp());
-                stack.setFrontHp(tpl.getBaseHp());
-                battleStacks.add(stack);
-            }
-        }
-
-        if (totalSpace > (general.getCapacity() == null ? 0 : general.getCapacity())) {
-            throw new RuntimeException("Exceeds General Capacity! Used: " + totalSpace + ", Max: " + general.getCapacity());
-        }
-
-        // 6. Wall Cost Deduction (Reduce Valid Battle Stacks)
-        if ("WALL".equals(stageConfig.getStageType())) {
-            int toDeduct = stageConfig.getWallCostTroops() == null ? 0 : stageConfig.getWallCostTroops();
-            if (toDeduct > 0) {
-                // Priority INF -> ARC -> CAV
-                String[] priority = {"INF", "ARC", "CAV"};
-                for (String type : priority) {
-                    if (toDeduct <= 0) break;
-                    // Find stacks of this type
-                    for (BattleContext.TroopStack s : battleStacks) {
-                        if (toDeduct <= 0) break;
-                        if (s.getType().equals(type)) {
-                            long count = s.getCount();
-                            long deduct = Math.min(count, toDeduct);
-                            s.setCount(count - deduct);
-                            toDeduct -= deduct;
-                        }
-                    }
-                }
-                // Remove empty stacks
-                List<BattleContext.TroopStack> cleanStacks = new ArrayList<>();
-                for (BattleContext.TroopStack s : battleStacks) {
-                    if (s.getCount() > 0) cleanStacks.add(s);
-                }
-                battleStacks = cleanStacks;
-
-                if (battleStacks.isEmpty()) {
-                    throw new RuntimeException("All troops died at the wall!");
-                }
-            }
-        }
-
-
-
-        // Troops (Deduct original config amount from Inventory)
-        if (troopConfig != null) {
-            for (Map.Entry<Integer, Integer> entry : troopConfig.entrySet()) {
-                Integer count = entry.getValue();
-                if (count > 0) {
-                    int dRows = userTroopMapper.safeDeduct(userId, entry.getKey(), count);
-                    if (dRows <= 0) {
-                        throw new RuntimeException("Not enough troops for ID: " + entry.getKey());
-                        // Note: Transaction will rollback.
-                    }
-                }
-            }
-        }
-
-        // 8. Build Context
-        BattleContext ctx = new BattleContext();
-        ctx.setBattleId(System.currentTimeMillis());
-        ctx.setRandomSeed(System.currentTimeMillis());
-
-        // Ally
-        BattleContext.SideContext allySide = new BattleContext.SideContext();
-        allySide.setTroops(battleStacks);
-        allySide.setHero(buildHeroState(userId, general));
-        ctx.setAlly(allySide);
-
-        // Enemy
-        BattleContext.SideContext enemySide;
-        try {
-            enemySide = objectMapper.readValue(stageConfig.getEnemyConfigJson(), BattleContext.SideContext.class);
-            // Apply Multiplier (HP/ATK * multiplier/1000)
-            int mult = stageConfig.getEnemyMultiplier() == null ? 1000 : stageConfig.getEnemyMultiplier();
-            if (mult != 1000) {
-                if (enemySide.getHero() != null) {
-                    enemySide.getHero().setMaxHp(enemySide.getHero().getMaxHp() * mult / 1000);
-                    enemySide.getHero().setCurrentHp(enemySide.getHero().getMaxHp());
-                    enemySide.getHero().setAtk(enemySide.getHero().getAtk() * mult / 1000);
-                }
-                if (enemySide.getTroops() != null) {
-                    for (BattleContext.TroopStack s : enemySide.getTroops()) {
-                        // s.getUnitHp() ? We don't have unitHp in JSON usually, we invoke template.
-                        // But for now assume JSON has full snapshot or we assume standard stats.
-                        // MVP: JSON contains snapshot.
-                        s.setUnitHp(s.getUnitHp() * mult / 1000);
-                        s.setFrontHp(s.getUnitHp());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Enemy Config JSON Error", e);
-        }
-        ctx.setEnemy(enemySide);
-
-        // 9. Save Session
-        BattleSessionTbl session = new BattleSessionTbl();
-        session.setUserId(userId);
-        session.setBattleId(ctx.getBattleId());
-        session.setCiv(civ); // Set Civ
-        session.setStageNo(stageNo);
-        session.setStatus(0);
-        session.setCurrentTurn(1);
-        try {
-            session.setContextJson(objectMapper.writeValueAsString(ctx));
-        } catch (Exception e) {
-            throw new RuntimeException("JSON error", e);
-        }
-
-        battleSessionMapper.insert(session);
-        return session.getBattleId();
-    }
 
     private final BattleSessionMapper battleSessionMapper;
     private final UserMapper userMapper;
@@ -202,629 +30,587 @@ public class BattleService {
     private final UserGemMapper userGemMapper;
     private final StoryStageConfigMapper storyStageConfigMapper;
     private final UserCivProgressMapper userCivProgressMapper;
-    private final StoryUnlockConfigMapper storyUnlockConfigMapper; // Added
-    private final PersonalityConfigMapper personalityConfigMapper;
+    private final StoryUnlockConfigMapper storyUnlockConfigMapper;
+    
+    private final DropPoolMapper dropPoolMapper;
     private final ObjectMapper objectMapper;
 
+    // The Engine (Stateless, reused)
+    private final BattleEngine battleEngine = new BattleEngine();
 
-    // Helper for Hero Stats
-    private BattleContext.HeroState buildHeroState(Long userId, UserGeneralTbl general) {
-        BattleContext.HeroState hero = new BattleContext.HeroState();
-        hero.setGeneralId(general.getId());
-
-        GeneralTemplateTbl genTpl = generalTemplateMapper.selectById(general.getTemplateId());
-        hero.setName((genTpl != null) ? genTpl.getName() : "Hero");
-        hero.setPersonality((genTpl != null) ? genTpl.getPersonalityCode() : "STOIC");
-
-        long maxHp = general.getMaxHp();
-        long atk = (genTpl != null) ? genTpl.getBaseAtk() : 0; // Simple base
-        int speed = (genTpl != null) ? genTpl.getSpeed() : 50;
-
-        List<UserEquipmentTbl> equips = userEquipmentMapper.selectByUserId(userId);
-        for (UserEquipmentTbl eq : equips) {
-            if (general.getId().equals(eq.getGeneralId())) {
-                EquipmentTemplateTbl tpl = equipmentTemplateMapper.selectById(eq.getTemplateId());
-                if (tpl != null) {
-                    maxHp += (tpl.getBaseHp() == null ? 0 : tpl.getBaseHp());
-                    atk += (tpl.getBaseAtk() == null ? 0 : tpl.getBaseAtk());
-                    speed += (tpl.getBaseSpd() == null ? 0 : tpl.getBaseSpd());
-
-                    int n = (eq.getEnhanceLevel() == null) ? 0 : eq.getEnhanceLevel();
-                    long bonus = 10L * n * (n + 1) / 2;
-                    if (tpl.getBaseHp() != null && tpl.getBaseHp() > 0) maxHp += bonus;
-                    if (tpl.getBaseAtk() != null && tpl.getBaseAtk() > 0) atk += bonus;
-
-                    // Gems
-                    if (eq.getSocket1GemId() != null) {
-                        UserGemTbl g = userGemMapper.selectById(eq.getSocket1GemId());
-                        if (g != null) {
-                            if ("HP".equals(g.getGemType())) maxHp += g.getStatValue();
-                            if ("ATK".equals(g.getGemType())) atk += g.getStatValue();
-                        }
-                    }
-                    if (eq.getSocket2GemId() != null) {
-                        UserGemTbl g = userGemMapper.selectById(eq.getSocket2GemId());
-                        if (g != null) {
-                            if ("HP".equals(g.getGemType())) maxHp += g.getStatValue();
-                            if ("ATK".equals(g.getGemType())) atk += g.getStatValue();
-                        }
-                    }
-                }
-            }
-        }
-
-        hero.setMaxHp(maxHp);
-        hero.setCurrentHp(maxHp);
-        hero.setAtk(atk);
-        hero.setSpeed(speed);
-        hero.setDead(false);
-        return hero;
+    {
+        // Inject Default Resolver (V1)
+        battleEngine.setSkillResolver(new SkillResolverImpl());
+        // Configure ObjectMapper for State
+        // Ensure unknown properties don't crash (forward compat)
+        // Check if ObjectMapper bean is configured this way globally better.
+        // Assuming default injection is fine.
     }
 
+    // --- Start Battle (Story) ---
     @Transactional(rollbackFor = Exception.class)
-    public Long startBattle(Long userId, Integer dungeonId) {
+    public BattleStartResult startStoryBattle(Long userId, String civ, Integer stageNo, Long generalId, Map<Integer, Integer> troopConfig) {
         // 1. Check existing session
         BattleSessionTbl existing = battleSessionMapper.selectByUserId(userId);
-        if (existing != null) {
-            // Already in battle? 
-            // For now, if ongoing, return existing ID or throw?
-            // "1玩家=1会话"
-            // If status=ONGOING, return existing.
-            if (existing.getStatus() == 0) {
-                return existing.getBattleId();
-            }
+        if (existing != null && existing.getStatus() == 0) {
+            throw new RuntimeException("已有进行中的战斗");
         }
 
-        // 2. Load User Data (General, Troops)
-        List<UserGeneralTbl> allGenerals = userGeneralMapper.selectByUserId(userId);
-        List<UserGeneralTbl> generals = new ArrayList<>();
-        for (UserGeneralTbl g : allGenerals) {
-            if (Boolean.TRUE.equals(g.getActivated())) {
-                generals.add(g);
-            }
+        // 2. Validate
+        UserGeneralTbl general = userGeneralMapper.selectById(generalId);
+        if (general == null || !Boolean.TRUE.equals(general.getUnlocked())) {
+            throw new RuntimeException("武将未解锁");
+        }
+        if (general.getRestTurns() != null && general.getRestTurns() > 0) {
+             throw new RuntimeException("武将正在休整中");
         }
 
-        if (generals.isEmpty()) {
-            throw new RuntimeException("没有激活的武将，无法出战");
+        // 3. Stage Config
+        StoryStageConfigTbl stageConfig = storyStageConfigMapper.selectByCivAndStage(civ, stageNo);
+        if (stageConfig == null) {
+            throw new RuntimeException("关卡不存在");
         }
 
-        // Load Troops
-        List<UserTroopTbl> troops = userTroopMapper.selectByUserId(userId);
+        // 4. Prepare Sides
+        BattleState.Side sideA = prepareAllySide(userId, general, troopConfig, stageConfig);
+        BattleState.Side sideB = prepareEnemySide(stageConfig);
 
-        // 3. Build Context
-        BattleContext ctx = new BattleContext();
-        ctx.setBattleId(System.currentTimeMillis());
-        ctx.setRandomSeed(System.currentTimeMillis());
+        // 5. Deduct Troops (Inventory)
+        deductTroopsFromInventory(userId, sideA.troops);
 
-        // Build Ally Context
-        ctx.setAlly(buildAllyContext(generals, troops, userId));
+        // 6. Create Battle State
+        BattleState state = new BattleState();
+        state.turnNo = 0;
+        state.sideA = sideA;
+        state.sideB = sideB;
+        state.rngSeed = System.currentTimeMillis();
+        state.actionNo = 0;
+        state.statusesA = new HashMap<>();
+        state.statusesB = new HashMap<>();
 
-        // Build Enemy Context (Based on DungeonId)
-        // This requires Dungeon Configuration. 
-        // For MVP, we might hardcode or read a DungeonTemplate.
-        ctx.setEnemy(buildEnemyContext(dungeonId));
-
-        // 4. Save Session
+        // 7. Save Session
         BattleSessionTbl session = new BattleSessionTbl();
         session.setUserId(userId);
-        session.setBattleId(ctx.getBattleId());
-        session.setStageNo(dungeonId);
-        session.setStatus(0); // Ongoing
-        session.setCurrentTurn(1);
+        session.setBattleId(System.currentTimeMillis());
+        session.setCiv(civ);
+        session.setStageNo(stageNo);
+        session.setStatus(0);
+        session.setCurrentTurn(0);
         try {
-            session.setContextJson(objectMapper.writeValueAsString(ctx));
+            session.setContextJson(objectMapper.writeValueAsString(state));
         } catch (Exception e) {
-            throw new RuntimeException("JSON Error", e);
+            throw new RuntimeException("JSON error", e);
         }
-        session.setCreatedAt(LocalDateTime.now());
-        session.setUpdatedAt(LocalDateTime.now());
 
         battleSessionMapper.insert(session);
-        return session.getBattleId();
+
+        // 8. 返回 battleId + 初始快照
+        BattleContext ctx = convertToContext(state, session.getBattleId(), new ArrayList<>());
+        return new BattleStartResult(session.getBattleId(), ctx);
     }
 
-
-    private BattleContext.SideContext buildAllyContext(List<UserGeneralTbl> generals, List<UserTroopTbl> troops, Long userId) {
-        BattleContext.SideContext side = new BattleContext.SideContext();
-
-        // Commander
-        UserGeneralTbl leader = generals.get(0);
-
-        BattleContext.HeroState hero = new BattleContext.HeroState();
-        hero.setGeneralId(leader.getId());
-
-        GeneralTemplateTbl genTpl = generalTemplateMapper.selectById(leader.getTemplateId());
-        String heroName = (genTpl != null && genTpl.getName() != null) ? genTpl.getName() : "Leader";
-        hero.setName(heroName);
-
-        // --- Calculate Stats (Base + Equipment + Gems) ---
-        long maxHp = leader.getMaxHp();
-        long atk = 0; // Base ATK? GeneralTbl doesn't have ATK? Assuming 0 base or from Template.
-        // Let's assume General has Base stats implicitly or from Template.
-        // For now, let's load Equipment Stats.
-
-        List<UserEquipmentTbl> equips = userEquipmentMapper.selectByUserId(userId);
-        for (UserEquipmentTbl eq : equips) {
-            if (leader.getId().equals(eq.getGeneralId())) {
-                EquipmentTemplateTbl tpl = equipmentTemplateMapper.selectById(eq.getTemplateId());
-                if (tpl != null) {
-                    // Base
-                    maxHp += (tpl.getBaseHp() == null ? 0 : tpl.getBaseHp());
-                    atk += (tpl.getBaseAtk() == null ? 0 : tpl.getBaseAtk());
-
-                    // Enhancement Bonus: X * n * (n+1) / 2
-                    // Assuming X=10 for simplicity as per requirements (or proportional to Base?)
-                    // "3.1 累加型成长公式...共用...给定初始值 X"
-                    // Let's assume X = 10% of Base? Or Fixed 10? Doc says "Example X=10".
-                    // Let's use Fixed 10 for HP/ATK per level for now.
-                    int n = (eq.getEnhanceLevel() == null) ? 0 : eq.getEnhanceLevel();
-                    long bonus = 10L * n * (n + 1) / 2;
-
-                    if (tpl.getBaseHp() != null && tpl.getBaseHp() > 0) maxHp += bonus;
-                    if (tpl.getBaseAtk() != null && tpl.getBaseAtk() > 0) atk += bonus;
-
-                    // Gem Bonus (Socket 1 & 2)
-                    if (eq.getSocket1GemId() != null) {
-                        UserGemTbl g = userGemMapper.selectById(eq.getSocket1GemId());
-                        if (g != null) {
-                            if ("HP".equals(g.getGemType())) maxHp += g.getStatValue();
-                            if ("ATK".equals(g.getGemType())) atk += g.getStatValue();
-                        }
-                    }
-                    if (eq.getSocket2GemId() != null) {
-                        UserGemTbl g = userGemMapper.selectById(eq.getSocket2GemId());
-                        if (g != null) {
-                            if ("HP".equals(g.getGemType())) maxHp += g.getStatValue();
-                            if ("ATK".equals(g.getGemType())) atk += g.getStatValue();
-                        }
-                    }
-                }
-            }
+    // --- 只读：获取当前战斗状态（不推进回合） ---
+    public BattleContext getBattleState(Long userId) {
+        BattleSessionTbl session = battleSessionMapper.selectByUserId(userId);
+        if (session == null) {
+            throw new RuntimeException("没有战斗记录");
         }
-
-        hero.setMaxHp(maxHp);
-        hero.setCurrentHp(maxHp);
-        hero.setAtk(atk);
-        hero.setDead(false);
-        hero.setRetreated(false);
-        side.setHero(hero);
-
-        // Troops
-        List<BattleContext.TroopStack> stacks = new ArrayList<>();
-        // Convert UserTroop to Stack
-        for (UserTroopTbl t : troops) {
-            if (t.getCount() > 0) {
-                TroopTemplateTbl tpl = troopTemplateMapper.selectById(t.getTroopId());
-                BattleContext.TroopStack stack = new BattleContext.TroopStack();
-                stack.setTroopId(t.getTroopId());
-                stack.setType(tpl.getTroopType()); // INF/ARC/CAV
-                stack.setCount(t.getCount());
-                stack.setUnitHp(tpl.getBaseHp());
-                stack.setFrontHp(tpl.getBaseHp()); // Fresh start
-                stacks.add(stack);
-            }
+        try {
+            BattleState state = objectMapper.readValue(session.getContextJson(), BattleState.class);
+            BattleContext ctx = convertToContext(state, session.getBattleId(), new ArrayList<>());
+            ctx.setCurrentTurn(session.getCurrentTurn());
+            ctx.setFinished(session.getStatus() != 0);
+            ctx.setWin(session.getStatus() == 1);
+            return ctx;
+        } catch (Exception e) {
+            throw new RuntimeException("Context Error", e);
         }
-        side.setTroops(stacks);
-        return side;
     }
 
-    private BattleContext.SideContext buildEnemyContext(Integer dungeonId) {
-        // Mock Implementation
-        BattleContext.SideContext side = new BattleContext.SideContext();
-        BattleContext.HeroState hero = new BattleContext.HeroState();
-        hero.setName("Enemy Boss");
-        hero.setMaxHp(1000L);
-        hero.setCurrentHp(1000L);
-        hero.setAtk(100L);
-        side.setHero(hero);
-
-        List<BattleContext.TroopStack> stacks = new ArrayList<>();
-        // Add dummy enemy troops
-        BattleContext.TroopStack stack = new BattleContext.TroopStack();
-        stack.setType("INF");
-        stack.setCount(100L);
-        stack.setUnitHp(10L);
-        stack.setFrontHp(10L);
-        stacks.add(stack);
-
-        side.setTroops(stacks);
-        return side;
-    }
-
+    // --- Process Turn ---
     @Transactional(rollbackFor = Exception.class)
-    public BattleContext processTurn(Long userId, Boolean castSkill) {
+    public BattleContext processTurn(Long userId, Boolean castSkill, Integer clientTurnNo) {
+        // Note: Returning BattleContext for frontend compatibility. 
+        // Ideally frontend should adapt to TurnResult or BattleState.
+        // For now, I will map BattleState -> BattleContext Structure broadly or just return state wrapped.
+        
         // 1. Get Session
         BattleSessionTbl session = battleSessionMapper.selectByUserId(userId);
         if (session == null || session.getStatus() != 0) {
             throw new RuntimeException("没有进行中的战斗");
         }
 
-        // 2. Load Context
-        BattleContext ctx;
+        // 2. Load State
+        BattleState state;
         try {
-            ctx = objectMapper.readValue(session.getContextJson(), BattleContext.class);
+            state = objectMapper.readValue(session.getContextJson(), BattleState.class);
         } catch (Exception e) {
             throw new RuntimeException("Context Error", e);
         }
 
-        ctx.getLogs().clear(); // Clear previous logs
-        ctx.getLogs().add("=== Turn " + session.getCurrentTurn() + " ===");
+        // 3. Construct Command
+        // Frontend sends "castSkill" boolean.
+        // Construct TurnCommand compatible with Engine.
+        // Engine expects sequence of commands.
+        // But Frontend is "One Click Turn".
+        // V1 Engine requires iterative calls for each actor action.
+        // Service needs to LOOP until Round Ends or Player Input required?
+        // IF we want "One Click = One Round":
+        //    Loop Engine.processTurn until state.currentActorIndex == 0 (Round Reset) AND some log exists.
+        
+        // 幂等校验：clientTurnNo 必须 == session.currentTurn + 1
+        if (clientTurnNo != null) {
+            int expectedTurn = session.getCurrentTurn() + 1;
+            if (clientTurnNo != expectedTurn) {
+                // 不匹配 → 返回当前状态，不推进
+                return convertToContext(state, session.getBattleId(), new ArrayList<>());
+            }
+        }
 
-        // --- PHASE 0: CD Reduction ---
-        reduceCd(ctx.getAlly().getHero());
-        reduceCd(ctx.getEnemy().getHero());
-
-        int allySpeed = ctx.getAlly().getHero().getSpeed() == null ? 50 : ctx.getAlly().getHero().getSpeed();
-        int enemySpeed = ctx.getEnemy().getHero().getSpeed() == null ? 50 : ctx.getEnemy().getHero().getSpeed();
-        boolean allyFirst = allySpeed >= enemySpeed;
-
-        // --- PHASE 1: Skill Phase ---
+        TurnCommand cmd = new TurnCommand();
+        cmd.clientTurnNo = state.turnNo + 1;
         if (Boolean.TRUE.equals(castSkill)) {
-            // Player Casts Skill
-            BattleContext.HeroState h = ctx.getAlly().getHero();
-            if (canAct(h) && (h.getSkillCd() == null || h.getSkillCd() <= 0)) {
-                ctx.getLogs().add("Wait, Player Skill Logic triggered in Turn?");
-                // Requirement: "Skill release happens in Turn phase"
-                // Execute Player Skill
-                long dmg = (long) (h.getAtk() * 1.5); // Defines strict formula? "Attack * 1.5"
-                ctx.getLogs().add(h.getName() + " casts Skill! Dmg: " + dmg);
-                executeDamage(dmg, ctx.getEnemy(), "SKILL", ctx.getLogs());
-                h.setSkillCd(3);
-            }
-        }
-        // Enemy Skill (Simple AI: cast if ready)
-        BattleContext.HeroState eh = ctx.getEnemy().getHero();
-        if (canAct(eh) && (eh.getSkillCd() == null || eh.getSkillCd() <= 0)) {
-            long dmg = (long) (eh.getAtk() * 1.5);
-            ctx.getLogs().add(eh.getName() + " casts Skill! Dmg: " + dmg);
-            executeDamage(dmg, ctx.getAlly(), "SKILL", ctx.getLogs());
-            eh.setSkillCd(3);
-        }
-
-        // --- PHASE 2: ARC Phase ---
-        if (allyFirst) {
-            executeTroopPhase(ctx.getAlly(), ctx.getEnemy(), "ARC", ctx.getLogs());
-            executeTroopPhase(ctx.getEnemy(), ctx.getAlly(), "ARC", ctx.getLogs());
+            cmd.type = TurnCommand.ActionType.SKILL; 
+            // Only effective if it's Player's Turn?
+            // Engine checks currentActor. 
+            // If currentActor is Player Hero -> Apply Skill.
+            // If currentActor is Troop -> Skill flag ignored (Normal Attack).
         } else {
-            executeTroopPhase(ctx.getEnemy(), ctx.getAlly(), "ARC", ctx.getLogs());
-            executeTroopPhase(ctx.getAlly(), ctx.getEnemy(), "ARC", ctx.getLogs());
+            cmd.type = TurnCommand.ActionType.NORMAL;
         }
 
-        // --- PHASE 3: Other Troops ---
-        String[] types = {"INF", "CAV"};
-        for (String type : types) {
-            if (allyFirst) {
-                executeTroopPhase(ctx.getAlly(), ctx.getEnemy(), type, ctx.getLogs());
-                executeTroopPhase(ctx.getEnemy(), ctx.getAlly(), type, ctx.getLogs());
-            } else {
-                executeTroopPhase(ctx.getEnemy(), ctx.getAlly(), type, ctx.getLogs());
-                executeTroopPhase(ctx.getAlly(), ctx.getEnemy(), type, ctx.getLogs());
-            }
-        }
-
-        // --- PHASE 4: Hero Attack ---
-        if (allyFirst) {
-            executeHeroAttack(ctx.getAlly(), ctx.getEnemy(), ctx.getLogs());
-            executeHeroAttack(ctx.getEnemy(), ctx.getAlly(), ctx.getLogs());
-        } else {
-            executeHeroAttack(ctx.getEnemy(), ctx.getAlly(), ctx.getLogs());
-            executeHeroAttack(ctx.getAlly(), ctx.getEnemy(), ctx.getLogs());
-        }
-
-        // --- PHASE 5: Retreat & End Turn ---
-        checkRetreat(ctx.getAlly(), ctx.getLogs());
-        checkRetreat(ctx.getEnemy(), ctx.getLogs());
-
-        session.setCurrentTurn(session.getCurrentTurn() + 1);
-
-        // Check Result
-        int result = 0;
-        if (isDefeated(ctx.getEnemy())) {
-            result = 1; // Win
-            ctx.getLogs().add("Enemy Defeated! Victory!");
-        } else if (isDefeated(ctx.getAlly())) {
-            result = 2; // Lose
-            ctx.getLogs().add("Ally Defeated! Defeat!");
-        } else if (session.getCurrentTurn() > ctx.getTurnLimit()) {
-            result = 2; // Draw/Lose
-            ctx.getLogs().add("Turn Limit Reached! Defeat!");
-        }
-
-        if (result != 0) {
-            finishBattle(session, result);
-        } else {
-            try {
-                session.setContextJson(objectMapper.writeValueAsString(ctx));
-            } catch (Exception e) {
-            }
-            battleSessionMapper.update(session);
-        }
-        return ctx;
-    }
-
-    private void reduceCd(BattleContext.HeroState h) {
-        if (h.getSkillCd() != null && h.getSkillCd() > 0) {
-            h.setSkillCd(h.getSkillCd() - 1);
-        }
-    }
-
-    private boolean canAct(BattleContext.HeroState h) {
-        return !h.isDead() && !h.isRetreated();
-    }
-
-    private boolean isDefeated(BattleContext.SideContext side) {
-        return side.getHero().isDead() || side.getHero().isRetreated();
-    }
-
-    private void executeTroopPhase(BattleContext.SideContext attacker, BattleContext.SideContext defender, String type, List<String> logs) {
-        for (BattleContext.TroopStack s : attacker.getTroops()) {
-            if (s.getType().equals(type) && s.isAlive()) {
-                long dmg = s.getCount() * 10; // Simplified Dmg
-                executeDamage(dmg, defender, type, logs); // Pass specific type
-            }
-        }
-    }
-
-
-    private void executeHeroAttack(BattleContext.SideContext attacker, BattleContext.SideContext defender, List<String> logs) {
-        if (canAct(attacker.getHero())) {
-            long dmg = attacker.getHero().getAtk();
-
-            // Last Stand Bonus
-            double hpRatio = (double)attacker.getHero().getCurrentHp() / attacker.getHero().getMaxHp();
-            if (hpRatio <= 0.1) {
-                // Check Personality
-                PersonalityConfigTbl p = personalityConfigMapper.selectByCode(attacker.getHero().getPersonality());
-                if (p != null && (p.getLastStandBias() == null ? 0 : p.getLastStandBias()) > 0) { // Brave/Berserker
-                     dmg = (long)(dmg * 1.2);
-                     logs.add(attacker.getHero().getName() + " enters Last Stand! (+20% Dmg)");
-                }
-            }
-
-            logs.add(attacker.getHero().getName() + " attacks! Dmg: " + dmg);
-            executeDamage(dmg, defender, "HERO_ATK", logs);
-        }
-    }
-
-
-    private void executeDamage(long dmg, BattleContext.SideContext targetSide, String sourceType, List<String> logs) {
-        // Target Logic
-        // 1. If Source == HERO -> Priority: Hero (if alive)
-        // 2. If Source == TROOP -> Priority: Counter > Elite > ARC > CAV > INF
-        // But prompt says: "Hero attacks: priority=enemy troop stack... Default: troop stack"
-        // Wait, "Hero attacks... priority = enemy troop stack?"
-        // Re-read Requirement 3): "Skill... default target = Enemy Hero".
-        // "Hero Normal Attack... priority = enemy troop stack" (implied by "Troop Attack default: enemy troop stack"?)
-        // Let's stick to standard RPG: 
-        // Skill -> Hero.
-        // Normal Attack -> Troops first (Protection).
-
-        if ("SKILL".equals(sourceType)) {
-            // Attack Hero directly
-            if (canAct(targetSide.getHero())) {
-                dealDamageToHero(targetSide.getHero(), dmg, logs);
-                return;
-            }
-        }
-
-
-        // Find Troop Target
-        BattleContext.TroopStack target = findTargetStack(targetSide.getTroops());
-
-        // If no troops, attack Hero
-        if (target == null) {
-            if (canAct(targetSide.getHero())) {
-                dealDamageToHero(targetSide.getHero(), dmg, logs);
-            }
-            return;
-        }
-
-        // Apply Counter Multiplier if Troop vs Troop
-        // Types: INF, ARC, CAV
-        // INF > ARC > CAV > INF
-        double multiplier = 1.0;
-        if (!"HERO_ATK".equals(sourceType) && !"SKILL".equals(sourceType)) {
-             String tType = target.getType();
-             if ("INF".equals(sourceType)) {
-                 if ("ARC".equals(tType)) multiplier = 1.2;
-                 else if ("CAV".equals(tType)) multiplier = 0.8;
-             } else if ("ARC".equals(sourceType)) {
-                 if ("CAV".equals(tType)) multiplier = 1.2;
-                 else if ("INF".equals(tType)) multiplier = 0.8;
-             } else if ("CAV".equals(sourceType)) {
-                 if ("INF".equals(tType)) multiplier = 1.2;
-                 else if ("ARC".equals(tType)) multiplier = 0.8;
-             }
+        // 4. Execution Loop (Run until Round Ends)
+        // Logic: Frontend press "Turn" -> Backend runs FULL ROUND (All actors act).
+        // This abstracts the queue from frontend.
+        List<BattleLogEvent> aggregatedLogs = new ArrayList<>();
+        
+        // Safety Break
+        int maxActions = 20; 
+        int actions = 0;
+        
+        // Initial check: if Battle Finished
+        if (state.isFinished) {
+             return convertToContext(state, session.getBattleId(), aggregatedLogs);
         }
         
-        long finalDmg = (long)(dmg * multiplier);
-        if (multiplier > 1.0) logs.add("Counter Attack! (x" + multiplier + ")");
-        else if (multiplier < 1.0) logs.add("Weak Attack... (x" + multiplier + ")");
-
-        // Apply Damage to Stack (with overflow)
-        long remaining = finalDmg;
-
-        while (remaining > 0 && target != null) {
-            remaining = applyDamageToStack(target, remaining, logs);
-            if (remaining > 0) {
-                target = findTargetStack(targetSide.getTroops()); // Find NEXT target
-            }
-        }
-    }
-
-    private void dealDamageToHero(BattleContext.HeroState hero, long dmg, List<String> logs) {
-        long old = hero.getCurrentHp();
-        long now = Math.max(0, old - dmg);
-        hero.setCurrentHp(now);
-        logs.add(hero.getName() + " takes " + dmg + " dmg (" + old + "->" + now + ")");
-        if (now <= 0) {
-            hero.setDead(true);
-            logs.add(hero.getName() + " is Defeated!");
-        }
-    }
-
-    private BattleContext.TroopStack findTargetStack(List<BattleContext.TroopStack> stacks) {
-        // Priority: INF > ARC > CAV (or whatever requirement says).
-        // Let's use Front-to-Back: INF -> CAV -> ARC
-        String[] prio = {"INF", "CAV", "ARC"};
-        for (String p : prio) {
-            for (BattleContext.TroopStack s : stacks) {
-                if (s.getType().equals(p) && s.isAlive()) return s;
-            }
-        }
-        return null;
-    }
-
-    private long applyDamageToStack(BattleContext.TroopStack s, long dmg, List<String> logs) {
-        long remaining = dmg;
-        long totalKill = 0;
-
-        while (remaining > 0 && s.getCount() > 0) {
-            if (remaining >= s.getFrontHp()) {
-                remaining -= s.getFrontHp();
-                s.setCount(s.getCount() - 1);
-                s.setFrontHp(s.getUnitHp());
-                totalKill++;
-            } else {
-                s.setFrontHp(s.getFrontHp() - remaining);
-                remaining = 0;
-            }
-        }
-        if (totalKill > 0) {
-            logs.add("Killed " + totalKill + " " + s.getType());
-        }
-        if (s.getCount() <= 0) {
-            s.setCount(0L);
-            s.setFrontHp(0L);
-        }
-        return remaining;
-    }
-
-    private void checkRetreat(BattleContext.SideContext side, List<String> logs) {
-        BattleContext.HeroState h = side.getHero();
-        if (canAct(h)) {
-            // Check Personality
-            PersonalityConfigTbl p = personalityConfigMapper.selectByCode(h.getPersonality());
-            double threshold = 0.1; // Default
-            if (p != null && p.getLastStandBias() < 0) { // Coward
-                threshold = 0.2;
-            } else if (p != null && p.getLastStandBias() > 0) { // Brave
-                threshold = 0.05;
-            }
-
-            if ((double) h.getCurrentHp() / h.getMaxHp() <= threshold) {
-                h.setRetreated(true);
-                logs.add(h.getName() + " Retreated!");
-            }
-        }
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void finishBattle(BattleSessionTbl session, int result) {
-        // 1. Update Session Status
-        session.setStatus(result);
-        session.setUpdatedAt(LocalDateTime.now());
-        battleSessionMapper.update(session);
-
-        // 2. Heal / Injury Logic (For General)
-        // Need to load General
-        // Assuming generalId available or we load from context
-        // For MVP, if Result=Win, we process rewards.
-
-        if (result == 1) { // VICTORY
-            BattleContext ctx;
+        // The Engine processes ONE ACTION per call.
+        // We want to run one full round (or until battle ends).
+        // Round start condition: currentActorIndex == 0.
+        // We start: process(action 0).
+        // then process(action 1)...
+        // until process(action N) -> index resets to 0.
+        
+        boolean roundStarted = (state.currentActorIndex == 0);
+        
+        do {
+            // Fix clientTurnNo for loop (Engine checks exact match)
+            cmd.clientTurnNo = state.turnNo + 1; 
+            
+            // Pass Skill flag only for Player Hero? 
+            // If we loop, we reuse same cmd?
+            // "castSkill" applies to the whole round? 
+            // If Player Hero acts in this round, he uses skill.
+            // If not (e.g. Stunned), flag wasted. OK.
+            
+            TurnResult res = battleEngine.processTurn(state, cmd);
+            aggregatedLogs.addAll(res.logEvents);
+            
+            if (res.finished) break;
+            
+            actions++;
+            // If index went back to 0, Round Finished.
+            if (state.currentActorIndex == 0) break;
+            
+        } while (actions < maxActions);
+        
+        // 5. Update Session
+        session.setCurrentTurn((int)state.turnNo); // Approx
+        if (state.isFinished) {
+            int result = state.isWin ? 1 : 2;
+            finishBattle(session, result, state);
+        } else {
             try {
-                ctx = objectMapper.readValue(session.getContextJson(), BattleContext.class);
-
-                // 1. Return Surviving Troops
-                for (BattleContext.TroopStack s : ctx.getAlly().getTroops()) {
-                    if (s.getCount() > 0) {
-                        userTroopMapper.upsertAdd(session.getUserId(), s.getTroopId(), s.getCount());
-                    }
-                }
-
-                // 2. Update Progress (One Source of Truth)
-                String civ = session.getCiv();
-                if (civ == null) civ = "CN";
-                Integer stageNo = session.getStageNo();
-
-                UserCivProgressTbl progress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), civ);
-                if (progress == null) {
-                     // Should generally not happen if validated at start, but handle it
-                     progress = new UserCivProgressTbl();
-                     progress.setUserId(session.getUserId());
-                     progress.setCiv(civ);
-                     progress.setMaxStageCleared(stageNo);
-                     progress.setUnlocked(true);
-                     userCivProgressMapper.insert(progress);
-                } else {
-                     if (stageNo > progress.getMaxStageCleared()) {
-                         progress.setMaxStageCleared(stageNo);
-                         userCivProgressMapper.update(progress);
-                     }
-                }
-
-                // 3. Unlock Logic (Config Driven)
-                StoryUnlockConfigTbl unlockConfig = storyUnlockConfigMapper.selectByCivAndStage(civ, stageNo);
-                
-                if (unlockConfig != null) {
-                    // A. Unlock Hero
-                    if (unlockConfig.getUnlockGeneralTemplateId() != null) {
-                        Integer tplId = unlockConfig.getUnlockGeneralTemplateId();
-                        UserGeneralTbl existingHero = userGeneralMapper.selectByUserIdAndTemplateId(session.getUserId(), tplId);
-                        if (existingHero == null) {
-                            GeneralTemplateTbl tpl = generalTemplateMapper.selectById(tplId);
-                            if (tpl != null) {
-                                UserGeneralTbl newHero = new UserGeneralTbl();
-                                newHero.setUserId(session.getUserId());
-                                newHero.setTemplateId(tplId);
-                                newHero.setUnlocked(true);
-                                newHero.setActivated(true); // Auto activate reward
-                                newHero.setLevel(1);
-                                newHero.setTier(0);
-                                newHero.setMaxHp(tpl.getBaseHp());
-                                newHero.setCurrentHp(tpl.getBaseHp());
-                                newHero.setCapacity(tpl.getBaseCapacity());
-                                newHero.setRestTurns(0);
-                                userGeneralMapper.insert(newHero);
-                            }
-                        }
-                    }
-
-                    // B. Unlock Next Country
-                    if (unlockConfig.getUnlockNextCiv() != null) {
-                        String nextCiv = unlockConfig.getUnlockNextCiv();
-                        UserCivProgressTbl nextProgress = userCivProgressMapper.selectByUserIdAndCiv(session.getUserId(), nextCiv);
-                        if (nextProgress == null) {
-                            nextProgress = new UserCivProgressTbl();
-                            nextProgress.setUserId(session.getUserId());
-                            nextProgress.setCiv(nextCiv);
-                            nextProgress.setMaxStageCleared(0);
-                            nextProgress.setUnlocked(true);
-                            userCivProgressMapper.insert(nextProgress);
-                        } else if (!Boolean.TRUE.equals(nextProgress.getUnlocked())) {
-                            nextProgress.setUnlocked(true);
-                            userCivProgressMapper.update(nextProgress);
-                        }
-                    }
-                }
-
-                // 4. Handle General Injury
-                BattleContext.HeroState h = ctx.getAlly().getHero();
-                if (h != null) {
-                    UserGeneralTbl g = userGeneralMapper.selectById(h.getGeneralId());
-                    if (g != null) {
-                        double ratio = (double) h.getCurrentHp() / h.getMaxHp();
-                        if (ratio < 0.5) { // Injured
-                            g.setRestTurns(3); 
-                            userGeneralMapper.update(g); 
-                        }
-                    }
-                }
-
+                session.setContextJson(objectMapper.writeValueAsString(state));
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            battleSessionMapper.update(session);
         }
+
+        return convertToContext(state, session.getBattleId(), aggregatedLogs);
+    }
+    
+    // --- Helper: Prepare Ally Side ---
+    private BattleState.Side prepareAllySide(Long userId, UserGeneralTbl general, Map<Integer, Integer> troopConfig, StoryStageConfigTbl stageConfig) {
+        BattleState.Side side = new BattleState.Side();
+        side.troops = new ArrayList<>();
+        
+        // 1. Hero
+        BattleState.Hero hero = new BattleState.Hero();
+        GeneralTemplateTbl genTpl = generalTemplateMapper.selectById(general.getTemplateId());
+        hero.name = (genTpl != null) ? genTpl.getName() : "Hero";
+        hero.speed = (genTpl != null) ? genTpl.getSpeed() : 50; // Default 50
+        
+        // Skills Mapping
+        hero.actives = new ArrayList<>();
+        hero.passives = new ArrayList<>();
+            // Personality -> Passive
+        if (genTpl != null && genTpl.getPersonalityCode() != null) {
+            String p = SkillIdMapper.getEnginePassiveId(genTpl.getPersonalityCode());
+            if (p != null) hero.passives.add(p);
+        }
+            // User Skill (DB: user_general_skill) -> Active
+            // Need mapper (not yet autowired? Add it or query directly)
+            // Simplified: Default Skill from Template
+        if (genTpl != null && genTpl.getDefaultSkillId() != 0) {
+             String skillName = SkillIdMapper.getEngineSkillId(genTpl.getDefaultSkillId());
+             if (skillName != null) hero.actives.add(skillName);
+        }
+        
+        // Stats
+        long maxHp = general.getMaxHp();
+        // Calc Equipment Stats... (Same as before code, omitted for brevity, assuming Load logic)
+        // Let's assume UserGeneralTbl has *final* values or we calc basic here
+        // Re-use logic:
+        long atk = (genTpl != null) ? genTpl.getBaseAtk() : 50; 
+        // ... (Equipment calc omitted, using base + level*10 for MVP)
+        atk += (general.getLevel() - 1) * 10L;
+        maxHp += (general.getLevel() - 1) * 50L;
+        
+        hero.maxHp = (int)maxHp;
+        hero.hp = (int)maxHp;
+        hero.atk = (int)atk;
+        hero.isDeadOrRetreated = false;
+        
+        side.hero = hero;
+
+        // 2. Troops
+        // Validate Capacity
+        int capacity = general.getCapacity() == null ? 5 : general.getCapacity();
+        int used = 0;
+        
+        if (troopConfig != null) {
+            for (Map.Entry<Integer, Integer> entry : troopConfig.entrySet()) {
+                if (entry.getValue() <= 0) continue;
+                TroopTemplateTbl tpl = troopTemplateMapper.selectById(entry.getKey());
+                if (tpl != null) {
+                     int cost = tpl.getCost() == null ? 1 : tpl.getCost();
+                     if (used + entry.getValue() * cost > capacity) continue; // Skip overflow
+                     used += entry.getValue() * cost;
+                     
+                     // Create Stack with troopId and initialCount
+                     TroopStack stack = new TroopStack(
+                         tpl.getTroopId(),
+                         tpl.getTroopType(), // "INF"
+                         entry.getValue(), 
+                         tpl.getBaseHp().intValue()
+                     );
+                     stack.initialCount = stack.count; // Explicitly set for new field
+                     stack.frontHp = stack.unitHp;
+                     side.troops.add(stack);
+                }
+            }
+        }
+        
+        // 3. Wall Cost Logic (Reuse logic: reduce counts)
+        if ("WALL".equals(stageConfig.getStageType())) {
+             int deduct = stageConfig.getWallCostTroops() == null ? 0 : stageConfig.getWallCostTroops();
+             for (TroopStack s : side.troops) {
+                 if (deduct <= 0) break;
+                 if (s.count <= deduct) {
+                     deduct -= s.count;
+                     s.count = 0;
+                 } else {
+                     s.count -= deduct;
+                     deduct = 0;
+                 }
+             }
+             // 城墙消耗 = 真实死亡，不参与战后救援
+             // 将 initialCount 同步为 wall 扣除后的 count
+             for (TroopStack s : side.troops) {
+                 s.initialCount = s.count;
+             }
+             if (side.troops.stream().allMatch(s -> s.count <= 0)) throw new RuntimeException("Troops died at wall");
+        }
+        
+        return side;
+    }
+    
+    private BattleState.Side prepareEnemySide(StoryStageConfigTbl config) {
+        BattleState.Side side = new BattleState.Side();
+        side.troops = new ArrayList<>();
+        BattleState.Hero hero = new BattleState.Hero();
+        
+        try {
+            Map<String, Object> map = objectMapper.readValue(config.getEnemyConfigJson(), Map.class);
+            Map<String, Object> hMap = (Map) map.get("hero");
+            List<Map> tList = (List) map.get("troops");
+            
+            hero.name = (String) hMap.getOrDefault("name", "Enemy");
+            hero.maxHp = ((Number) hMap.getOrDefault("maxHp", 1000)).intValue();
+            hero.hp = hero.maxHp;
+            hero.atk = ((Number) hMap.getOrDefault("atk", 100)).intValue();
+            hero.speed = ((Number) hMap.getOrDefault("speed", 50)).intValue();
+            hero.actives = new ArrayList<>();
+            side.hero = hero;
+            
+            if (tList != null) {
+                for (Map t : tList) {
+                    int tId = ((Number) t.getOrDefault("troopId", 0)).intValue(); // Enemy troop ID
+                    String type = (String) t.getOrDefault("type", "INF");
+                    int count = ((Number) t.getOrDefault("count", 10)).intValue();
+                    int unitHp = ((Number) t.getOrDefault("unitHp", 20)).intValue();
+                    
+                    TroopStack s = new TroopStack(tId, type, count, unitHp);
+                    s.initialCount = count;
+                    s.frontHp = unitHp;
+                    side.troops.add(s);
+                }
+            }
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Enemy Config Error", e);
+        }
+        return side;
+    }
+    
+    // --- Helpers ---
+    private void validateGeneral(UserGeneralTbl g, Long userId) {
+        if (!g.getUserId().equals(userId)) throw new RuntimeException("General not owner");
+        if (!Boolean.TRUE.equals(g.getActivated())) throw new RuntimeException("Not activated");
+        if (g.getRestTurns() != null && g.getRestTurns() > 0) throw new RuntimeException("Resting");
+    }
+    
+    private void validateProgress(Long userId, String civ, Integer stage) {
+        UserCivProgressTbl p = userCivProgressMapper.selectByUserIdAndCiv(userId, civ);
+        if (p == null || !Boolean.TRUE.equals(p.getUnlocked())) throw new RuntimeException("Civ Locked");
+        int max = p.getMaxStageCleared() == null ? 0 : p.getMaxStageCleared();
+        if (stage > max + 1) throw new RuntimeException("Stage Locked");
+    }
+    
+    private void deductTroopsFromInventory(Long userId, List<TroopStack> stacks) {
+        if (stacks == null) return;
+        for (TroopStack s : stacks) {
+            if (s.troopId > 0 && s.initialCount > 0) {
+                int res = userTroopMapper.safeDeduct(userId, s.troopId, s.initialCount);
+                if (res <= 0) {
+                    throw new RuntimeException("Troops not enough: " + s.type);
+                }
+            }
+        }
+    }
+
+    private void deductTroopsFromInventory(Long userId, Map<Integer, Integer> config) {
+         if (config == null) return;
+         for (Map.Entry<Integer, Integer> e : config.entrySet()) {
+             if (e.getValue() > 0) {
+                 userTroopMapper.safeDeduct(userId, e.getKey(), e.getValue());
+             }
+         }
+    }
+    
+    // Finish
+    private void finishBattle(BattleSessionTbl session, int result, BattleState state) {
+        session.setStatus(result);
+        session.setUpdatedAt(LocalDateTime.now());
+        try {
+            session.setContextJson(objectMapper.writeValueAsString(state));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        battleSessionMapper.update(session);
+        
+        // Handle Rewards & Settlement
+        // Even if lose, we might recover some troops
+        handleSettlement(session, state, result == 1);
+    }
+    
+    private void handleSettlement(BattleSessionTbl session, BattleState state, boolean isWin) {
+        Long userId = session.getUserId();
+        String civ = session.getCiv();
+        Integer stageNo = session.getStageNo();
+        
+        // 1. Troop Recovery (Dead Troops Rescue)
+        // Rule: Survivors return 100%. Dead troops recovered at 50% (Win) or 10% (Lose).
+        double rescueRate = isWin ? 0.5 : 0.1;
+        
+        for (TroopStack s : state.sideA.troops) {
+            if (s.troopId <= 0) continue; // Skip summons/unknown
+            
+            int survivors = s.count;
+            int initial = s.initialCount > survivors ? s.initialCount : survivors; // Safety
+            int dead = initial - survivors;
+            int rescued = (int) (dead * rescueRate);
+            int totalReturn = survivors + rescued;
+            
+            if (totalReturn > 0) {
+                userTroopMapper.upsertAdd(userId, s.troopId, (long)totalReturn);
+            }
+        }
+        
+        // 2. Victory Rewards (Only if Win)
+        if (isWin) {
+            handleVictoryRewards(userId, civ, stageNo);
+        }
+    }
+
+    private void handleVictoryRewards(Long userId, String civ, Integer stageNo) {
+        // A. Update Progress (Max Stage)
+        UserCivProgressTbl p = userCivProgressMapper.selectByUserIdAndCiv(userId, civ);
+        if (p != null) {
+            if (stageNo > (p.getMaxStageCleared() == null ? 0 : p.getMaxStageCleared())) {
+                p.setMaxStageCleared(stageNo);
+                userCivProgressMapper.update(p);
+            }
+        } else {
+            // Should exist if we entered battle, but safe fallback
+            p = new UserCivProgressTbl();
+            p.setUserId(userId);
+            p.setCiv(civ);
+            p.setMaxStageCleared(stageNo);
+            p.setUnlocked(true);
+            userCivProgressMapper.insert(p);
+        }
+        
+        // B. Configuration Unlocks (General, Civ)
+        StoryUnlockConfigTbl unlock = storyUnlockConfigMapper.selectByCivAndStage(civ, stageNo);
+        if (unlock != null) {
+            // Unlock General（防重：已拥有则跳过）
+            if (unlock.getUnlockGeneralTemplateId() != null) {
+                Integer gid = unlock.getUnlockGeneralTemplateId();
+                UserGeneralTbl existing = userGeneralMapper.selectByUserIdAndTemplateId(userId, gid);
+                if (existing == null) {
+                    UserGeneralTbl ug = new UserGeneralTbl();
+                    ug.setUserId(userId);
+                    ug.setTemplateId(gid);
+                    ug.setUnlocked(true);
+                    ug.setActivated(false);
+                    ug.setLevel(1);
+                    ug.setTier(0);
+                    
+                    GeneralTemplateTbl tpl = generalTemplateMapper.selectById(gid);
+                    if (tpl != null) {
+                        ug.setMaxHp(tpl.getBaseHp());
+                        ug.setCurrentHp(tpl.getBaseHp());
+                        ug.setCapacity(tpl.getBaseCapacity());
+                    } else {
+                        ug.setMaxHp(100L); ug.setCurrentHp(100L); ug.setCapacity(5);
+                    }
+                    userGeneralMapper.insert(ug);
+                }
+            }
+            
+            // Unlock Next Civ
+            if (unlock.getUnlockNextCiv() != null) {
+                String nextCiv = unlock.getUnlockNextCiv();
+                UserCivProgressTbl np = userCivProgressMapper.selectByUserIdAndCiv(userId, nextCiv);
+                if (np == null) {
+                    np = new UserCivProgressTbl();
+                    np.setUserId(userId);
+                    np.setCiv(nextCiv);
+                    np.setUnlocked(true);
+                    np.setMaxStageCleared(0);
+                    userCivProgressMapper.insert(np);
+                } else if (!Boolean.TRUE.equals(np.getUnlocked())) {
+                    np.setUnlocked(true);
+                    userCivProgressMapper.update(np);
+                }
+            }
+        }
+        
+        // C. Drops (Gold) — MVP: 只取第一个 GOLD entry 发一次
+        StoryStageConfigTbl stageCfg = storyStageConfigMapper.selectByCivAndStage(civ, stageNo);
+        if (stageCfg != null && stageCfg.getDropPoolId() != null) {
+             DropPoolTbl pool = dropPoolMapper.selectById(stageCfg.getDropPoolId());
+             if (pool != null && pool.getEntriesJson() != null) {
+                 try {
+                     List<Map<String, Object>> entries = objectMapper.readValue(pool.getEntriesJson(), List.class);
+                     // MVP: 找到第一个 GOLD entry 就发，不循环所有
+                     for (Map<String, Object> entry : entries) {
+                         String type = (String) entry.getOrDefault("type", "");
+                         if ("GOLD".equals(type)) {
+                             int min = ((Number) entry.getOrDefault("min", 0)).intValue();
+                             int max = ((Number) entry.getOrDefault("max", 0)).intValue();
+                             int val = min + (int)(Math.random() * (max - min + 1));
+                             if (val > 0) {
+                                  userMapper.reduceGold(userId, -val);
+                             }
+                             break; // 只发一次
+                         }
+                     }
+                 } catch (Exception e) {
+                     e.printStackTrace();
+                 }
+             }
+        }
+    }
+
+    // Convert to Old Context for Frontend (MappingV1)
+    private BattleContext convertToContext(BattleState state, Long battleId, List<BattleLogEvent> logs) {
+        BattleContext ctx = new BattleContext();
+        ctx.setBattleId(battleId);
+        
+        // Map Logs
+        List<String> strLogs = new ArrayList<>();
+        if(logs != null) {
+            for (BattleLogEvent e : logs) {
+                strLogs.add(String.format("[%s] %s -> %s: %s (Val:%d)", e.type, e.actorId, e.targetId, e.desc, e.value));
+            }
+            ctx.setLogs(strLogs);
+        }
+        
+        // Ally
+        BattleContext.SideContext ally = new BattleContext.SideContext();
+        ally.setHero(mapHero(state.sideA.hero));
+        ally.setTroops(mapTroops(state.sideA.troops));
+        ctx.setAlly(ally);
+        
+        // Enemy
+        BattleContext.SideContext enemy = new BattleContext.SideContext();
+        enemy.setHero(mapHero(state.sideB.hero));
+        enemy.setTroops(mapTroops(state.sideB.troops));
+        ctx.setEnemy(enemy);
+        // 战斗进度
+        ctx.setCurrentTurn((int) state.turnNo);
+        ctx.setFinished(state.isFinished);
+        ctx.setWin(state.isWin);
+        
+        return ctx;
+    }
+    
+    private BattleContext.HeroState mapHero(BattleState.Hero h) {
+        if (h == null) return new BattleContext.HeroState();
+        BattleContext.HeroState hs = new BattleContext.HeroState();
+        hs.setName(h.name);
+        hs.setCurrentHp((long)h.hp);
+        hs.setMaxHp((long)h.maxHp);
+        hs.setAtk((long)h.atk);
+        hs.setDead(h.hp <= 0);
+        return hs;
+    }
+    
+    private List<BattleContext.TroopStack> mapTroops(List<TroopStack> list) {
+        List<BattleContext.TroopStack> ret = new ArrayList<>();
+        if(list == null) return ret;
+        for (TroopStack s : list) {
+            BattleContext.TroopStack ts = new BattleContext.TroopStack();
+            ts.setType(s.type);
+            ts.setCount((long)s.count);
+            ts.setUnitHp((long)s.unitHp);
+            ts.setFrontHp((long)s.frontHp);
+            ret.add(ts);
+        }
+        return ret;
+    }
+
+    // Start Battle Override (Legacy)
+    @Transactional(rollbackFor = Exception.class)
+    public BattleStartResult startBattle(Long userId, Integer dungeonId) { 
+        List<UserGeneralTbl> gs = userGeneralMapper.selectByUserId(userId);
+        Long gid = null;
+        for(UserGeneralTbl g : gs) { if(Boolean.TRUE.equals(g.getActivated())) { gid = g.getId(); break; }}
+        if(gid == null) throw new RuntimeException("No active general");
+        
+        return startStoryBattle(userId, "CN", dungeonId, gid, null);
     }
 }
