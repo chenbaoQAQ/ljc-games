@@ -2,19 +2,19 @@ import { playerAPI, hallAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
 
 export function HallPage(container) {
-    const userId = localStorage.getItem('userId');
-    if (!userId) {
-        router.navigate('/login');
-        return;
-    }
+  const userId = localStorage.getItem('userId');
+  if (!userId) {
+    router.navigate('/login');
+    return;
+  }
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div class="hall-container">
       <!-- 顶部导航栏 -->
       <nav class="hall-nav">
         <div class="nav-left">
           <h1 class="hall-title">三国群英传</h1>
-          <span class="player-name" id="player-name">主公</span>
+          <span class="player-name" id="player-name">${localStorage.getItem('username') || '主公'}</span>
         </div>
         <div class="nav-right">
           <div class="resource-display">
@@ -94,9 +94,9 @@ export function HallPage(container) {
     </div>
   `;
 
-    // 添加样式
-    const style = document.createElement('style');
-    style.textContent = `
+  // 添加样式
+  const style = document.createElement('style');
+  style.textContent = `
     .hall-container {
       min-height: 100vh;
       background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-medium) 100%);
@@ -323,100 +323,111 @@ export function HallPage(container) {
       }
     }
   `;
-    document.head.appendChild(style);
+  document.head.appendChild(style);
 
-    // 加载数据
-    loadPlayerData();
-    loadGenerals();
-    loadProgress();
+  // 加载数据
+  loadPlayerData();
+  loadGenerals();
+  loadProgress();
 
-    async function loadPlayerData() {
-        try {
-            const result = await playerAPI.getInfo(userId);
-            if (result.code === 0) {
-                document.getElementById('player-name').textContent = result.data.nickname;
-                document.getElementById('gold-count').textContent = result.data.gold.toLocaleString();
-                document.getElementById('diamond-count').textContent = result.data.diamond.toLocaleString();
+  async function loadPlayerData() {
+    try {
+      const result = await playerAPI.getInfo(userId);
+      console.log('玩家数据:', result);
+      if (result.code === 200 && result.data) {
+        document.getElementById('player-name').textContent = result.data.nickname;
+        document.getElementById('gold-count').textContent = (result.data.gold || 0).toLocaleString();
+        document.getElementById('diamond-count').textContent = (result.data.diamond || 0).toLocaleString();
 
-                // 更新兵力显示
-                const troopMap = { 1: 'inf', 2: 'arc', 3: 'cav' };
-                result.data.troops.forEach(troop => {
-                    const type = troopMap[troop.troopId];
-                    if (type) {
-                        document.getElementById(`${type}-count`).textContent = troop.count.toLocaleString();
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('加载玩家数据失败:', error);
+        // 更新兵力显示 - troopId: xx01=步兵(INF), xx02=弓兵(ARC), xx03=骑兵(CAV)
+        if (result.data.troops) {
+          // 按兵种类型汇总（同一用户可能有多国兵种）
+          let infTotal = 0, arcTotal = 0, cavTotal = 0;
+          result.data.troops.forEach(troop => {
+            const suffix = troop.troopId % 100;
+            if (suffix === 1) infTotal += (troop.count || 0);
+            else if (suffix === 2) arcTotal += (troop.count || 0);
+            else if (suffix === 3) cavTotal += (troop.count || 0);
+          });
+          document.getElementById('inf-count').textContent = infTotal.toLocaleString();
+          document.getElementById('arc-count').textContent = arcTotal.toLocaleString();
+          document.getElementById('cav-count').textContent = cavTotal.toLocaleString();
         }
+      } else {
+        console.warn('加载玩家数据: code不为200', result);
+      }
+    } catch (error) {
+      console.error('加载玩家数据失败:', error);
     }
+  }
 
-    async function loadGenerals() {
-        try {
-            const result = await hallAPI.getGenerals(userId);
-            const grid = document.getElementById('generals-grid');
+  async function loadGenerals() {
+    try {
+      const result = await hallAPI.getGenerals(userId);
+      console.log('武将数据:', result);
+      const grid = document.getElementById('generals-grid');
 
-            if (result.code === 0 && result.data.length > 0) {
-                grid.innerHTML = result.data.slice(0, 4).map(general => `
+      if (result.code === 200 && result.data && result.data.length > 0) {
+        grid.innerHTML = result.data.slice(0, 4).map(general => `
           <div class="general-card" data-id="${general.id}">
             <div class="general-avatar">🎖️</div>
-            <div class="general-name">${general.templateId === 1 ? '关羽' : general.templateId === 2 ? '张飞' : '赵云'}</div>
+            <div class="general-name">武将#${general.templateId}</div>
             <div class="general-level">Lv.${general.level}</div>
-            ${general.activated ? '<div class="badge badge-inf">已激活</div>' : ''}
+            ${general.activated ? '<div class="badge badge-inf">已激活</div>' : '<div class="badge" style="background:rgba(255,255,255,0.1)">未激活</div>'}
           </div>
         `).join('');
-            } else {
-                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">暂无武将</p>';
-            }
-        } catch (error) {
-            console.error('加载武将失败:', error);
-            document.getElementById('generals-grid').innerHTML =
-                '<p style="grid-column: 1/-1; text-align: center; color: var(--danger-color);">加载失败</p>';
-        }
+      } else {
+        grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">暂无武将</p>';
+      }
+    } catch (error) {
+      console.error('加载武将失败:', error);
+      document.getElementById('generals-grid').innerHTML =
+        '<p style="grid-column: 1/-1; text-align: center; color: var(--danger-color);">加载失败</p>';
     }
+  }
 
-    async function loadProgress() {
-        try {
-            const result = await hallAPI.getProgress(userId);
-            const grid = document.getElementById('progress-grid');
+  async function loadProgress() {
+    try {
+      const result = await hallAPI.getProgress(userId);
+      console.log('进度数据:', result);
+      const grid = document.getElementById('progress-grid');
 
-            if (result.code === 0 && result.data.length > 0) {
-                const civNames = { CN: '🇨🇳 中国', JP: '🇯🇵 日本', KR: '🇰🇷 韩国', GB: '🇬🇧 英国' };
-                grid.innerHTML = result.data.map(prog => `
+      if (result.code === 200 && result.data && result.data.length > 0) {
+        const civNames = { CN: '🇨🇳 中国', JP: '🇯🇵 日本', KR: '🇰🇷 韩国', GB: '🇬🇧 英国' };
+        grid.innerHTML = result.data.map(prog => `
           <div class="progress-item">
             <div class="progress-civ">
               <span class="badge badge-${prog.civ.toLowerCase()}">${civNames[prog.civ] || prog.civ}</span>
             </div>
             <div class="progress-stage">
-              当前进度: ${prog.maxStageCleared}/10 关
-              ${prog.isUnlocked ? '' : '<br/><span style="color: var(--danger-color);">未解锁</span>'}
+              当前进度: ${prog.maxStageCleared || 0}/10 关
+              ${prog.unlocked ? '' : '<br/><span style="color: var(--danger-color);">🔒 未解锁</span>'}
             </div>
           </div>
         `).join('');
-            } else {
-                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">暂无进度</p>';
-            }
-        } catch (error) {
-            console.error('加载进度失败:', error);
-        }
+      } else {
+        grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">暂无进度</p>';
+      }
+    } catch (error) {
+      console.error('加载进度失败:', error);
     }
+  }
 
-    // 事件绑定
-    document.getElementById('logout-btn').addEventListener('click', () => {
-        localStorage.clear();
-        router.navigate('/login');
-    });
+  // 事件绑定
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    localStorage.clear();
+    router.navigate('/login');
+  });
 
-    document.getElementById('select-stage-btn').addEventListener('click', () => {
-        router.navigate('/stages');
-    });
+  document.getElementById('select-stage-btn').addEventListener('click', () => {
+    router.navigate('/stages');
+  });
 
-    document.getElementById('manage-generals-btn').addEventListener('click', () => {
-        alert('武将管理功能开发中...');
-    });
+  document.getElementById('manage-generals-btn').addEventListener('click', () => {
+    alert('武将管理功能开发中...');
+  });
 
-    document.getElementById('recruit-btn').addEventListener('click', () => {
-        alert('招兵功能开发中...');
-    });
+  document.getElementById('recruit-btn').addEventListener('click', () => {
+    router.navigate('/recruit');
+  });
 }
