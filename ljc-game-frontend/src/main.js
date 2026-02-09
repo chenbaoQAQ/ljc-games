@@ -3,12 +3,14 @@ import { LoginPage } from './pages/LoginPage.js';
 import { HallPage } from './pages/HallPage.js';
 import { RecruitPage } from './pages/RecruitPage.js';
 import { GeneralsPage } from './pages/GeneralsPage.js';
+import { StageSelectionPage } from './pages/StageSelectionPage.js';
 
 // 注册路由
 router.register('/login', LoginPage);
 router.register('/hall', HallPage);
 router.register('/recruit', RecruitPage);
 router.register('/generals', GeneralsPage);
+router.register('/stages', StageSelectionPage);
 
 // 初始化应用
 function init() {
