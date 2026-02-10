@@ -94,6 +94,9 @@ INSERT INTO user_equipments (user_id, template_id, enhance_level, general_id, sl
 -- 8.3 初始宝石
 INSERT INTO user_gems (user_id, gem_type, gem_level, stat_value, is_used) VALUES
     (1, 'ATK', 1, 10, 0),
+    (1, 'ATK', 1, 10, 0),
+    (1, 'ATK', 1, 10, 0),
+    (1, 'ATK', 1, 10, 0),
     (1, 'ATK', 1, 10, 0);
 
 -- 8.4 初始道具 (技能书: ItemId=301 -> SkillId=1)

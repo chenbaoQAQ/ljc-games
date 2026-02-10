@@ -16,6 +16,9 @@ public class PlayerInitService {
     private final UserTroopMapper userTroopMapper;
     private final GeneralTemplateMapper generalTemplateMapper;
     private final TroopTemplateMapper troopTemplateMapper;
+    private final UserInventoryMapper userInventoryMapper;
+    private final UserEquipmentMapper userEquipmentMapper;
+    private final UserGemMapper userGemMapper;
 
     // 常量配置
     private static final int START_GENERAL_ID = 1001; // 初始武将ID
@@ -100,18 +103,50 @@ public class PlayerInitService {
         // 3. 发放初始兵力
         TroopTemplateTbl troopTpl = troopTemplateMapper.selectById(START_TROOP_ID);
         if (troopTpl == null) {
-            throw new RuntimeException("初始兵种模板缺失: ID " + START_TROOP_ID);
+            // throw new RuntimeException("初始兵种模板缺失: ID " + START_TROOP_ID);
+        } else {
+            UserTroopTbl troop = new UserTroopTbl();
+            troop.setUserId(userId);
+            troop.setTroopId(START_TROOP_ID);
+            troop.setCount((long) START_TROOP_COUNT);
+            userTroopMapper.insert(troop);
         }
 
-        // 创建 UserTroopTbl 对象
-        UserTroopTbl troop = new UserTroopTbl();
-        // 给予 userId, START_TROOP_ID, START_TROOP_COUNT
-        troop.setUserId(userId);
-        troop.setTroopId(START_TROOP_ID);
-        troop.setCount((long) START_TROOP_COUNT);
+        // 4. 发放初始道具 (技能书*10, itemId 301)
+        UserInventoryTbl book = new UserInventoryTbl();
+        book.setUserId(userId);
+        book.setItemId(301);
+        book.setCount(10);
+        userInventoryMapper.insert(book);
 
-        // 插入数据库
-        userTroopMapper.insert(troop);
+        // 5. 发放初始装备 (武器+1, 防具+0)
+        // 铁剑
+        UserEquipmentTbl equip1 = new UserEquipmentTbl();
+        equip1.setUserId(userId);
+        equip1.setTemplateId(1); 
+        equip1.setEnhanceLevel(1);
+        userEquipmentMapper.insert(equip1);
+        
+        // 皮甲
+        UserEquipmentTbl equip2 = new UserEquipmentTbl();
+        equip2.setUserId(userId);
+        equip2.setTemplateId(2); 
+        equip2.setEnhanceLevel(0);
+        userEquipmentMapper.insert(equip2);
+
+        // 6. 发放初始宝石 (ATK Level 1 * 10) 以供合成测试
+        for (int i = 0; i < 10; i++) {
+            UserGemTbl gem = new UserGemTbl();
+            gem.setUserId(userId);
+            gem.setGemType("ATK");
+            gem.setGemLevel(1);
+            gem.setStatValue(10L); 
+            gem.setIsUsed(false);
+            userGemMapper.insert(gem);
+        }
+
+        // ----------------------------------------------------
+
         // ----------------------------------------------------
 
         System.out.println("玩家 " + userId + " 数据初始化完成！");

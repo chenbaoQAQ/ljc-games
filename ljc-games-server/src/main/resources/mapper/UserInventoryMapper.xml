@@ -16,4 +16,9 @@
         SELECT * FROM user_inventory WHERE user_id = #{userId}
     </select>
 
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_inventory (user_id, item_id, count)
+        VALUES (#{userId}, #{itemId}, #{count})
+    </insert>
+
 </mapper>

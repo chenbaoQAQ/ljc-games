@@ -16,4 +16,6 @@ public interface UserInventoryMapper {
     
     // 查询用户所有道具
     java.util.List<ljc.entity.UserInventoryTbl> selectByUserId(@Param("userId") Long userId);
+
+    int insert(ljc.entity.UserInventoryTbl item);
 }
