@@ -248,8 +248,10 @@ public class HallService {
         }
         Integer newSkillId = map.getSkillId();
         
+        System.out.println("Processing learnSkill: userId=" + userId + ", bookItemId=" + bookItemId);
         // 2. Consume Item
         int rows = userInventoryMapper.decreaseItem(userId, bookItemId, 1);
+        System.out.println("DecreaseItem result: rows=" + rows);
         if (rows == 0) {
             throw new RuntimeException("扣除道具失败（数量可能不足）");
         }

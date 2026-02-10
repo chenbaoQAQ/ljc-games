@@ -125,6 +125,7 @@ public class PlayerInitService {
         equip1.setUserId(userId);
         equip1.setTemplateId(1); 
         equip1.setEnhanceLevel(1);
+        equip1.setIsLocked(false);
         userEquipmentMapper.insert(equip1);
         
         // 皮甲
@@ -132,6 +133,7 @@ public class PlayerInitService {
         equip2.setUserId(userId);
         equip2.setTemplateId(2); 
         equip2.setEnhanceLevel(0);
+        equip2.setIsLocked(false);
         userEquipmentMapper.insert(equip2);
 
         // 6. 发放初始宝石 (ATK Level 1 * 10) 以供合成测试

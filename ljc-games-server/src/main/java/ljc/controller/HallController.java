@@ -60,6 +60,7 @@ public class HallController {
 
     @PostMapping("/skill/learn")
     public Result<String> learnSkill(@RequestParam Long userId, @RequestParam Long generalId, @RequestParam Integer bookItemId) {
+        System.out.println("Controller: learnSkill called");
         hallService.learnSkill(userId, generalId, bookItemId);
         return Result.success("学习成功");
     }

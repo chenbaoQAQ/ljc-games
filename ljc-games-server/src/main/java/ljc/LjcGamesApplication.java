@@ -10,6 +10,7 @@ import org.mybatis.spring.annotation.MapperScan;
 public class LjcGamesApplication {
 
     public static void main(String[] args) {
+        System.out.println("====== LJC GAMES SERVER STARTING (VERSION CHECK) ======");
         SpringApplication.run(LjcGamesApplication.class, args);
     }
 
