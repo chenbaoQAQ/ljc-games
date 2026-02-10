@@ -464,12 +464,12 @@ public class HallService {
             GeneralTemplateTbl gt = generalTemplateMapper.selectById(g.getTemplateId());
             if (gt != null) {
                 vo.setName(gt.getName());
-                // Base Stats
-                int baseHp = (gt.getBaseHp() != null ? gt.getBaseHp() : 500) + (g.getLevel() - 1) * 50; 
+                // Base Stats - Use Long for calculation
+                long baseHp = (gt.getBaseHp() != null ? gt.getBaseHp() : 500L) + (g.getLevel() - 1) * 50L; 
                 // Capacity: Base + Level
-                int cap = (gt.getBaseCapacity() != null ? gt.getBaseCapacity() : 5) + (g.getLevel() - 1);
+                long cap = (gt.getBaseCapacity() != null ? gt.getBaseCapacity().longValue() : 5L) + (g.getLevel() - 1);
                 // ATK: Base + (Level-1)*5
-                int atk = (gt.getBaseAtk() != null ? gt.getBaseAtk() : 50) + (g.getLevel() - 1) * 5;
+                long atk = (gt.getBaseAtk() != null ? gt.getBaseAtk() : 50L) + (g.getLevel() - 1) * 5L;
                 
                 // Equipments Bonus
                 for (UserEquipmentTbl eq : allEquips) {
@@ -477,31 +477,28 @@ public class HallService {
                         EquipmentTemplateTbl et = equipmentTemplateMapper.selectById(eq.getTemplateId());
                         if (et != null) {
                             // Base from Equip
-                            atk += (et.getBaseAtk() != null ? et.getBaseAtk().intValue() : 0);
-                            baseHp += (et.getBaseHp() != null ? et.getBaseHp().intValue() : 0);
+                            atk += (et.getBaseAtk() != null ? et.getBaseAtk() : 0L);
+                            baseHp += (et.getBaseHp() != null ? et.getBaseHp() : 0L);
                             
-                            // Enhance Bonus: +10% per level? Or flat?
-                            // Simple: +Level * 10 ATK/HP
-                            int elv = eq.getEnhanceLevel();
-                            atk += elv * 10;
-                            baseHp += elv * 50;
+                            // Enhance Bonus: +10% per level?
+                            int elv = (eq.getEnhanceLevel() != null ? eq.getEnhanceLevel() : 0);
+                            atk += elv * 10L;
+                            baseHp += elv * 50L;
                         }
                         
                         // Gem Bonus
-                        // Check socket1/2
                         if (eq.getSocket1GemId() != null) {
-                            // Find gem
                             UserGemTbl gem = allGems.stream().filter(x -> x.getId().equals(eq.getSocket1GemId())).findFirst().orElse(null);
                             if (gem != null) {
-                                if ("ATK".equals(gem.getGemType())) atk += gem.getStatValue().intValue();
-                                if ("HP".equals(gem.getGemType())) baseHp += gem.getStatValue().intValue();
+                                if ("ATK".equals(gem.getGemType())) atk += gem.getStatValue();
+                                if ("HP".equals(gem.getGemType())) baseHp += gem.getStatValue();
                             }
                         }
                         if (eq.getSocket2GemId() != null) {
                              UserGemTbl gem = allGems.stream().filter(x -> x.getId().equals(eq.getSocket2GemId())).findFirst().orElse(null);
                             if (gem != null) {
-                                if ("ATK".equals(gem.getGemType())) atk += gem.getStatValue().intValue();
-                                if ("HP".equals(gem.getGemType())) baseHp += gem.getStatValue().intValue();
+                                if ("ATK".equals(gem.getGemType())) atk += gem.getStatValue();
+                                if ("HP".equals(gem.getGemType())) baseHp += gem.getStatValue();
                             }
                         }
                     }
@@ -517,7 +514,7 @@ public class HallService {
             if (skillLink != null) {
                 SkillTemplateTbl st = skillTemplateMapper.selectById(skillLink.getCurrentSkillId());
                 if (st != null) {
-                    vo.setCurrentSkillId(st.getId());
+                    vo.setCurrentSkillId(st.getSkillId()); // Fix: getSkillId() instead of getId()
                     vo.setSkillName(st.getName());
                     vo.setSkillDesc(st.getDescription());
                 }

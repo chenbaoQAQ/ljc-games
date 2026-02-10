@@ -14,12 +14,12 @@ public class UserGeneralVO {
     private Integer tier;
     private Boolean unlocked;
     private Boolean activated;
-    private Integer maxHp;
-    private Integer currentHp;
-    private Integer capacity;
+    private Long maxHp;
+    private Long currentHp;
+    private Long capacity;
     
     // Calculated Stat
-    private Integer atk;
+    private Long atk;
     
     // Skill Info
     private Integer currentSkillId;
