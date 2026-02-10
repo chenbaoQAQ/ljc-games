@@ -1,4 +1,4 @@
-import { battleAPI, hallAPI, playerAPI, troopAPI } from '../api/index.js';
+import { battleAPI, hallAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
 
 export function BattlePage(container, params) {
@@ -135,37 +135,8 @@ export function BattlePage(container, params) {
   `;
     document.head.appendChild(style);
 
-    if (isNewBattle) {
-        startNewBattle(params);
-    } else {
-        resumeBattle();
-    }
-
-    async function startNewBattle({ civ, stageNo }) {
-        try {
-            // 获取出战武将
-            const gRes = await hallAPI.getGenerals(userId);
-            const general = gRes.data?.find(g => g.activated);
-            if (!general) { alert("无出战武将"); router.navigate('/hall'); return; }
-
-            // 获取兵力配置
-            const allTroops = await troopAPI.getTroops(userId);
-            const troopConfig = {};
-            if (allTroops.data) {
-                allTroops.data.forEach(t => troopConfig[t.troopId] = Math.min(t.totalCount, 100)); // Cap 100
-            }
-
-            const res = await battleAPI.startStoryBattle(userId, civ, stageNo, general.id, troopConfig);
-            if (res.code === 200) {
-                battleState = res.data.context;
-                renderBattle(battleState);
-                checkTurn();
-            } else {
-                alert("战斗启动失败: " + res.message);
-                router.navigate('/hall');
-            }
-        } catch (e) { console.error(e); }
-    }
+    // Mod: Only resume battle. New battles are started in BattlePreparePage.
+    resumeBattle();
 
     async function resumeBattle() {
         try {
@@ -175,7 +146,7 @@ export function BattlePage(container, params) {
                 renderBattle(battleState);
                 checkTurn();
             } else {
-                router.navigate('/hall');
+                router.navigate('/hall'); // No active battle
             }
         } catch (e) { router.navigate('/hall'); }
     }
