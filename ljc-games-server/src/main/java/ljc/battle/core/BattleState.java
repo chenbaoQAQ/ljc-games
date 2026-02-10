@@ -64,9 +64,9 @@ public class BattleState {
         public int skillCd; // 剩余CD
         public int maxSkillCd; // 技能最大CD
         
-        // 延迟技能机制 (V2)
-        public String castingSkillId; // 正在吟唱/准备的技能
-        public int castingSkillTurns; // 剩余吟唱回合
+        // 延迟技能机制 (V2.8 Modified)
+        // nextTurnSkillId: 如果不为空，则下一回合强制释放该技能
+        public String nextTurnSkillId; 
         public String tactics;        // 当前战术指令 (TARGET_INF, ETC)
 
         public Hero() {

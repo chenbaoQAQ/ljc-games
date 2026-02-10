@@ -24,7 +24,6 @@ public class BattleLogEvent { /* renamed from BattleLogEntry to avoid conflict *
         HEAL,
         STATUS_APPLIED,
         STATUS_EXPIRED,
-        STATUS_EXPIRED,
         REFLECT_DAMAGE,
         SKILL,        // 技能爆发
         SKILL_CAST,   // 技能蓄力
