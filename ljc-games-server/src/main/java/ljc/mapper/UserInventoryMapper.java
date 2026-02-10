@@ -13,4 +13,7 @@ public interface UserInventoryMapper {
     
     // Add select if needed
     Integer selectCount(@Param("userId") Long userId, @Param("itemId") Integer itemId);
+    
+    // 查询用户所有道具
+    java.util.List<ljc.entity.UserInventoryTbl> selectByUserId(@Param("userId") Long userId);
 }

@@ -83,11 +83,10 @@ export function HallPage(container) {
         <!-- 其他功能 -->
         <div class="section-card card">
           <h2 class="card-title">🔧 其他功能</h2>
-          <div class="actions-grid">
-            <button class="btn btn-secondary">装备强化</button>
-            <button class="btn btn-secondary">宝石镶嵌</button>
-            <button class="btn btn-secondary">技能学习</button>
-            <button class="btn btn-secondary">爬塔挑战</button>
+            <button class="btn btn-secondary" id="equip-btn">装备强化</button>
+            <button class="btn btn-secondary" id="gem-btn">宝石镶嵌</button>
+            <button class="btn btn-secondary" id="skill-btn">技能学习</button>
+            <button class="btn btn-secondary" id="tower-btn">爬塔挑战</button>
           </div>
         </div>
       </div>
@@ -427,7 +426,9 @@ export function HallPage(container) {
     router.navigate('/generals');
   });
 
-  document.getElementById('recruit-btn').addEventListener('click', () => {
-    router.navigate('/recruit');
-  });
+  document.getElementById('recruit-btn').addEventListener('click', () => { router.navigate('/recruit'); });
+  document.getElementById('equip-btn').addEventListener('click', () => { router.navigate('/equipment'); });
+  document.getElementById('gem-btn').addEventListener('click', () => { router.navigate('/gem'); });
+  document.getElementById('skill-btn').addEventListener('click', () => { router.navigate('/skill'); });
+  document.getElementById('tower-btn').addEventListener('click', () => { alert('爬塔功能敬请期待'); });
 }

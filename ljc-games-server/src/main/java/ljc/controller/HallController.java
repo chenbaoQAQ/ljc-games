@@ -103,6 +103,21 @@ public class HallController {
     public Result<java.util.List<ljc.entity.UserGeneralTbl>> getGenerals(@RequestParam Long userId) {
         return Result.success(hallService.getGenerals(userId));
     }
+
+    @GetMapping("/equipments")
+    public Result<java.util.List<ljc.entity.UserEquipmentTbl>> getEquipments(@RequestParam Long userId) {
+        return Result.success(hallService.getEquipments(userId));
+    }
+
+    @GetMapping("/gems")
+    public Result<java.util.List<ljc.entity.UserGemTbl>> getGems(@RequestParam Long userId) {
+        return Result.success(hallService.getGems(userId));
+    }
+
+    @GetMapping("/items")
+    public Result<java.util.List<ljc.entity.UserInventoryTbl>> getItems(@RequestParam Long userId) {
+        return Result.success(hallService.getItems(userId));
+    }
 }
 
 

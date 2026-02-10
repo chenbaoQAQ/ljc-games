@@ -448,5 +448,17 @@ public class HallService {
     public List<UserCivProgressTbl> getProgress(Long userId) {
         return userCivProgressMapper.selectByUserId(userId);
     }
+
+    public List<UserEquipmentTbl> getEquipments(Long userId) {
+        return userEquipmentMapper.selectByUserId(userId);
+    }
+
+    public List<UserGemTbl> getGems(Long userId) {
+        return userGemMapper.selectByUserId(userId);
+    }
+
+    public List<UserInventoryTbl> getItems(Long userId) {
+        return userInventoryMapper.selectByUserId(userId);
+    }
 }
 

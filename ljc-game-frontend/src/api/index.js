@@ -144,6 +144,21 @@ export const hallAPI = {
     combineGem(userId, gemType, level) {
         return API.postWithParams('/hall/gem/combine', { userId }, { gemType, level });
     },
+
+    // GET /hall/equipments?userId=xxx
+    getEquipments(userId) {
+        return API.get('/hall/equipments', { userId });
+    },
+
+    // GET /hall/gems?userId=xxx
+    getGems(userId) {
+        return API.get('/hall/gems', { userId });
+    },
+
+    // GET /hall/items?userId=xxx
+    getItems(userId) {
+        return API.get('/hall/items', { userId });
+    },
 };
 
 // ============ 战斗 API ============
