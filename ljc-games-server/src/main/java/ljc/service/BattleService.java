@@ -102,7 +102,15 @@ public class BattleService {
             throw new RuntimeException("JSON error", e);
         }
 
-        battleSessionMapper.insert(session);
+        // 9. 初始化 nextActorDesc (V2)
+        state.nextActorDesc = battleEngine.predictNextActor(state);
+        try {
+            // Save initial state with actor
+            session.setContextJson(objectMapper.writeValueAsString(state));
+            battleSessionMapper.insert(session);
+        } catch (Exception e) {
+            throw new RuntimeException("JSON error", e);
+        }
 
         // 8. 返回 battleId + 初始快照
         BattleContext ctx = convertToContext(state, session.getBattleId(), new ArrayList<>());
@@ -545,12 +553,21 @@ public class BattleService {
         }
     }
 
-    // Convert to Old Context for Frontend (MappingV1)
+    // Convert to Context for Frontend
     private BattleContext convertToContext(BattleState state, Long battleId, List<BattleLogEvent> logs) {
         BattleContext ctx = new BattleContext();
         ctx.setBattleId(battleId);
         
-        // Map Logs
+        // V2: Direct Mapping
+        ctx.setSideA(state.sideA);
+        ctx.setSideB(state.sideB);
+        ctx.setNextActorDesc(state.nextActorDesc);
+        ctx.setLastEvents(logs);
+        ctx.setTurnNo((long)state.turnNo);
+        ctx.setFinished(state.isFinished);
+        ctx.setWin(state.isWin);
+
+        // Map Logs (Legacy String)
         List<String> strLogs = new ArrayList<>();
         if(logs != null) {
             for (BattleLogEvent e : logs) {
@@ -559,25 +576,22 @@ public class BattleService {
             ctx.setLogs(strLogs);
         }
         
-        // Ally
+        // Ally/Enemy (Legacy Mapping, keep for safety)
         BattleContext.SideContext ally = new BattleContext.SideContext();
         ally.setHero(mapHero(state.sideA.hero));
         ally.setTroops(mapTroops(state.sideA.troops));
         ctx.setAlly(ally);
         
-        // Enemy
         BattleContext.SideContext enemy = new BattleContext.SideContext();
         enemy.setHero(mapHero(state.sideB.hero));
         enemy.setTroops(mapTroops(state.sideB.troops));
         ctx.setEnemy(enemy);
-        // 战斗进度
+        
         ctx.setCurrentTurn((int) state.turnNo);
-        ctx.setFinished(state.isFinished);
-        ctx.setWin(state.isWin);
         
         return ctx;
     }
-    
+
     private BattleContext.HeroState mapHero(BattleState.Hero h) {
         if (h == null) return new BattleContext.HeroState();
         BattleContext.HeroState hs = new BattleContext.HeroState();

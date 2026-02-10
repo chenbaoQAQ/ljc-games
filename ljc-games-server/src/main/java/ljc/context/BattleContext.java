@@ -22,9 +22,21 @@ public class BattleContext {
     private Integer turnLimit = 20;
     private List<String> logs = new ArrayList<>();
     
-    // Models
+    // Models (Legacy)
     private SideContext ally;
     private SideContext enemy;
+
+    // Direct Mapping for Frontend (V2)
+    // Avoid mapping overhead, expose engine state structure directly
+    private ljc.battle.core.BattleState.Side sideA;
+    private ljc.battle.core.BattleState.Side sideB;
+    
+    // Control
+    private String nextActorDesc;
+    private List<ljc.battle.core.BattleLogEvent> lastEvents;
+    private Long turnNo;
+    // isFinished/isWin exist above as primitives (boolean)
+
     
     @Data
     @NoArgsConstructor

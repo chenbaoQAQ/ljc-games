@@ -32,6 +32,7 @@ public class BattleState {
     public String lastActionLog; // 调试用
     public boolean isFinished;
     public boolean isWin;       // true=玩家胜
+    public String nextActorDesc; // 下一个行动者描述 (HeroA, INF_A, etc)
 
     // ========== 内部类定义 ==========
 

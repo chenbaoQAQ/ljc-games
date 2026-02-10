@@ -106,10 +106,15 @@ public class BattleEngine {
                  int idx = state.currentActorIndex;
                  if (idx >= nextQueue.size()) idx = 0;
                  Actor next = nextQueue.get(idx);
-                 result.nextActorIndex = idx;
-                 result.nextActorDesc = next.isHero 
+                 String desc = next.isHero 
                      ? (next.side == state.sideA ? "HeroA" : "HeroB") 
                      : (next.troop.type + (next.side == state.sideA ? "_A" : "_B"));
+                 
+                 result.nextActorIndex = idx;
+                 result.nextActorDesc = desc;
+                 state.nextActorDesc = desc; // Sync to State for persistence
+             } else {
+                 state.nextActorDesc = null;
              }
         }
         
@@ -118,6 +123,18 @@ public class BattleEngine {
         result.currentTurn = state.turnNo;
         
         return result;
+    }
+
+    // Expose for Start Battle Initialization
+    public String predictNextActor(BattleState state) {
+        List<Actor> q = determineActionQueue(state);
+        if (q.isEmpty()) return null;
+        int idx = state.currentActorIndex;
+        if (idx >= q.size()) idx = 0;
+        Actor next = q.get(idx);
+        return next.isHero 
+             ? (next.side == state.sideA ? "HeroA" : "HeroB") 
+             : (next.troop.type + (next.side == state.sideA ? "_A" : "_B"));
     }
 
     // --- 内部逻辑 ---
