@@ -2,10 +2,10 @@ import { hallAPI, playerAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
 
 export function StageSelectionPage(container) {
-    const userId = localStorage.getItem('userId');
-    if (!userId) { router.navigate('/login'); return; }
+  const userId = localStorage.getItem('userId');
+  if (!userId) { router.navigate('/login'); return; }
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div class="stage-page">
       <nav class="page-nav">
         <button class="btn btn-secondary btn-sm" id="back-btn">← 返回大厅</button>
@@ -32,10 +32,10 @@ export function StageSelectionPage(container) {
     </div>
   `;
 
-    const style = document.createElement('style');
-    style.id = 'stage-page-style';
-    document.getElementById('stage-page-style')?.remove();
-    style.textContent = `
+  const style = document.createElement('style');
+  style.id = 'stage-page-style';
+  document.getElementById('stage-page-style')?.remove();
+  style.textContent = `
     .stage-page {
       min-height: 100vh;
       background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-medium) 100%);
@@ -149,108 +149,106 @@ export function StageSelectionPage(container) {
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
   `;
-    document.head.appendChild(style);
+  document.head.appendChild(style);
 
-    // --- 状态 ---
-    let currentCiv = 'CN';
-    let progressData = []; // 存储后端返回的进度 List
+  // --- 状态 ---
+  let currentCiv = 'CN';
+  let progressData = []; // 存储后端返回的进度 List
 
-    // --- 初始化 ---
-    init();
+  // --- 初始化 ---
+  init();
 
-    async function init() {
-        // 绑定 Tab 点击
-        document.querySelectorAll('.civ-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.civ-tab').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentCiv = btn.dataset.civ;
-                renderStages();
-            });
-        });
+  async function init() {
+    // 绑定 Tab 点击
+    document.querySelectorAll('.civ-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.civ-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentCiv = btn.dataset.civ;
+        renderStages();
+      });
+    });
 
-        document.getElementById('back-btn').addEventListener('click', () => {
-            router.navigate('/hall');
-        });
+    document.getElementById('back-btn').addEventListener('click', () => {
+      router.navigate('/hall');
+    });
 
-        // 加载数据
-        try {
-            const [progRes, playerRes] = await Promise.all([
-                hallAPI.getProgress(userId),
-                playerAPI.getInfo(userId)
-            ]);
+    // 加载数据
+    try {
+      const [progRes, playerRes] = await Promise.all([
+        hallAPI.getProgress(userId),
+        playerAPI.getInfo(userId)
+      ]);
 
-            if (playerRes.code === 200 && playerRes.data) {
-                document.getElementById('gold-display').textContent = (playerRes.data.gold || 0).toLocaleString();
-            }
+      if (playerRes.code === 200 && playerRes.data) {
+        document.getElementById('gold-display').textContent = (playerRes.data.gold || 0).toLocaleString();
+      }
 
-            if (progRes.code === 200 && progRes.data) {
-                progressData = progRes.data;
-                renderStages();
-            }
-        } catch (e) {
-            console.error('加载失败', e);
-            document.getElementById('stage-grid').innerHTML = '<p>加载失败，请重试</p>';
-        }
+      if (progRes.code === 200 && progRes.data) {
+        progressData = progRes.data;
+        renderStages();
+      }
+    } catch (e) {
+      console.error('加载失败', e);
+      document.getElementById('stage-grid').innerHTML = '<p>加载失败，请重试</p>';
     }
+  }
 
-    function renderStages() {
-        const grid = document.getElementById('stage-grid');
-        grid.innerHTML = '';
+  function renderStages() {
+    const grid = document.getElementById('stage-grid');
+    grid.innerHTML = '';
 
-        // 找到当前阵营的进度
-        const civProg = progressData.find(p => p.civ === currentCiv);
+    // 找到当前阵营的进度
+    const civProg = progressData.find(p => p.civ === currentCiv);
 
-        if (!civProg || !civProg.unlocked) {
-            grid.innerHTML = `
+    if (!civProg || !civProg.unlocked) {
+      grid.innerHTML = `
         <div style="grid-column:1/-1; text-align:center; padding: 40px;">
           <h2>🔒 该势力尚未解锁</h2>
           <p style="color:var(--text-secondary)">请先通关前置势力的主线关卡</p>
         </div>
       `;
-            return;
-        }
+      return;
+    }
 
-        // 假设每个阵营 10 关
-        const totalStages = 10;
-        const cleared = civProg.maxStageCleared || 0;
+    // 假设每个阵营 10 关
+    const totalStages = 10;
+    const cleared = civProg.maxStageCleared || 0;
 
-        for (let i = 1; i <= totalStages; i++) {
-            const isCleared = i <= cleared;
-            const isUnlocked = i <= cleared + 1; // 下一关解锁
+    for (let i = 1; i <= totalStages; i++) {
+      const isCleared = i <= cleared;
+      const isUnlocked = i <= cleared + 1; // 下一关解锁
 
-            const card = document.createElement('div');
-            card.className = `stage-card ${isCleared ? 'cleared' : ''} ${isUnlocked ? 'unlocked' : 'locked'}`;
+      const card = document.createElement('div');
+      card.className = `stage-card ${isCleared ? 'cleared' : ''} ${isUnlocked ? 'unlocked' : 'locked'}`;
 
-            // 关卡类型判断 (简单逻辑：5是城墙，10是BOSS)
-            let typeText = '普通';
-            if (i === 5 || i === 9) typeText = '🏰 攻城';
-            if (i === 10) typeText = '👹 BOSS';
+      // 关卡类型判断 (简单逻辑：5是城墙，10是BOSS)
+      let typeText = '普通';
+      if (i === 5 || i === 9) typeText = '🏰 攻城';
+      if (i === 10) typeText = '👹 BOSS';
 
-            card.innerHTML = `
+      card.innerHTML = `
         ${!isUnlocked ? '<div class="lock-icon">🔒</div>' : ''}
         <div class="stage-name">第 ${i} 关</div>
         <div class="stage-desc">${typeText}</div>
         <div class="stage-num">${i}</div>
       `;
 
-            if (isUnlocked) {
-                card.addEventListener('click', () => {
-                    // 这里以后跳转到战斗准备页，现在先弹个提示
-                    // router.navigate(`/battle/prepare?civ=${currentCiv}&stage=${i}`);
-                    enterBattlePrepare(currentCiv, i);
-                });
-            }
+      if (isUnlocked) {
+        card.addEventListener('click', () => {
+          // 这里以后跳转到战斗准备页，现在先弹个提示
+          // router.navigate(`/battle/prepare?civ=${currentCiv}&stage=${i}`);
+          enterBattlePrepare(currentCiv, i);
+        });
+      }
 
-            grid.appendChild(card);
-        }
+      grid.appendChild(card);
     }
+  }
 
-    function enterBattlePrepare(civ, stage) {
-        // 暂时的处理
-        if (confirm(`准备攻打 [${civ} 第${stage}关] 吗？\n(战斗模块即将上线)`)) {
-            // 以后这里调 battleAPI.startStoryBattle
-            console.log('Start battle:', civ, stage);
-        }
+  function enterBattlePrepare(civ, stage) {
+    if (confirm(`准备攻打 [${civ} 第${stage}关] 吗？`)) {
+      router.navigate('/battle', { civ, stageNo: stage });
     }
+  }
 }

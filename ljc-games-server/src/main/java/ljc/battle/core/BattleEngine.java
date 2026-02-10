@@ -376,14 +376,34 @@ public class BattleEngine {
             }
         }
         
-        // 2. Troops (ARC -> INF -> CAV)
-        addTroopsByType(queue, state, "ARC");
-        addTroopsByType(queue, state, "INF");
-        addTroopsByType(queue, state, "CAV");
+        // 2. Troops (Sort by Elite priority or just add all)
+        // Strategy: Iterate all troops of both sides, add to queue.
+        // We want specific order: ARC(A/B) -> INF(A/B) -> CAV(A/B) ?
+        // Or just let them act based on some speed? Troops don't have speed in config yet.
+        // Let's stick to type order: ARC first, then INF, then CAV.
+        
+        addAllTroopsByType(queue, state, "ARC");
+        addAllTroopsByType(queue, state, "INF");
+        addAllTroopsByType(queue, state, "CAV");
         
         return queue;
     }
-    
+
+    private void addAllTroopsByType(List<Actor> queue, BattleState state, String type) {
+        // Side A
+        for (TroopStack s : state.sideA.troops) {
+            if (s.type.equalsIgnoreCase(type) && s.count > 0) {
+                queue.add(new Actor(state.sideA, false, s));
+            }
+        }
+        // Side B
+        for (TroopStack s : state.sideB.troops) {
+            if (s.type.equalsIgnoreCase(type) && s.count > 0) {
+                queue.add(new Actor(state.sideB, false, s));
+            }
+        }
+    }
+
     private boolean hasPassive(Side side, String passive) {
         return side.hero != null && side.hero.passives != null && side.hero.passives.contains(passive);
     }
@@ -393,14 +413,6 @@ public class BattleEngine {
             if (a.isHero && a.side == side) return a;
         }
         return null;
-    }
-    
-    private void addTroopsByType(List<Actor> queue, BattleState state, String type) {
-        TroopStack tA = findStack(state.sideA, type);
-        if (tA != null && tA.count > 0) queue.add(new Actor(state.sideA, false, tA));
-        
-        TroopStack tB = findStack(state.sideB, type);
-        if (tB != null && tB.count > 0) queue.add(new Actor(state.sideB, false, tB));
     }
 
     private TroopStack findStack(Side side, String type) {

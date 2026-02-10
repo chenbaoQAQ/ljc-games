@@ -7,6 +7,7 @@ import { StageSelectionPage } from './pages/StageSelectionPage.js';
 import { EquipmentPage } from './pages/EquipmentPage.js';
 import { GemPage } from './pages/GemPage.js';
 import { SkillPage } from './pages/SkillPage.js';
+import { BattlePage } from './pages/BattlePage.js';
 
 // 注册路由
 router.register('/login', LoginPage);
@@ -17,6 +18,7 @@ router.register('/stages', StageSelectionPage);
 router.register('/equipment', EquipmentPage);
 router.register('/gem', GemPage);
 router.register('/skill', SkillPage);
+router.register('/battle', BattlePage);
 
 // 初始化应用
 function init() {

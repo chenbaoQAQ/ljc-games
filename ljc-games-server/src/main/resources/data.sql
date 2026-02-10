@@ -53,7 +53,13 @@ INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, bas
     -- GB troops
     (2301, 'GB', 'Footman', 'INF', 0, 1, 15, 60, 20, 0),
     (2302, 'GB', 'Archer', 'ARC', 0, 1, 20, 40, 20, 0),
-    (2303, 'GB', 'Cavalry', 'CAV', 0, 2, 25, 80, 40, 0);
+    (2303, 'GB', 'Cavalry', 'CAV', 0, 2, 25, 80, 40, 0),
+    
+    -- Elite Troops
+    (3001, 'CN', '诸葛连弩', 'ARC', 1, 2, 35, 60, 100, 1),
+    (3002, 'JP', '鬼武者', 'INF', 1, 2, 40, 80, 100, 1),
+    (3003, 'KR', '花郎箭手', 'ARC', 1, 2, 30, 50, 100, 1),
+    (3004, 'GB', '皇家骑士', 'CAV', 1, 3, 45, 120, 150, 1);
 
 
 -- 4. 插入初始武将 (关键！ID=1001)
