@@ -133,8 +133,8 @@ CREATE TABLE IF NOT EXISTS user_equipments (
 
   enhance_level INT NOT NULL DEFAULT 0,   -- 0~8，默认全成功（不做概率）
 
-  socket1_gem_id BIGINT NOT NULL DEFAULT 0,
-  socket2_gem_id BIGINT NOT NULL DEFAULT 0,
+  socket1_gem_id BIGINT DEFAULT NULL,
+  socket2_gem_id BIGINT DEFAULT NULL,
 
   general_id BIGINT DEFAULT NULL,         -- 穿戴在哪个武将身上 (NULL=未穿戴)
   slot VARCHAR(12) DEFAULT NULL,          -- 穿戴在哪个槽位 (NULL=未穿戴)
