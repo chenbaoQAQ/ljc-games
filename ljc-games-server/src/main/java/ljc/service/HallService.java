@@ -249,7 +249,10 @@ public class HallService {
         Integer newSkillId = map.getSkillId();
         
         // 2. Consume Item
-        userInventoryMapper.decreaseItem(userId, bookItemId, 1);
+        int rows = userInventoryMapper.decreaseItem(userId, bookItemId, 1);
+        if (rows == 0) {
+            throw new RuntimeException("扣除道具失败（数量可能不足）");
+        }
         
         // 3. Update or Insert Skill
         // Check existing
