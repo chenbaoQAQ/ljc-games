@@ -171,10 +171,10 @@ public class BattleEngine {
                 hero.castingSkillTurns--;
                 if (hero.castingSkillTurns <= 0) {
                     // 技能爆发！
-                    SkillResolver.SkillDecision decision = new SkillResolver.SkillDecision(SkillResolver.SkillDecision.Type.SKILL);
+                    SkillResolver.SkillDecision decision = new SkillResolver.SkillDecision(SkillResolver.SkillDecision.Type.SKILL_A);
                     SkillResolver.SkillEffect effect = skillResolver.resolve(state, decision);
                     for (String log : effect.logs) {
-                        result.logEvents.add(new BattleLogEvent(Type.ATTACK, actorId, "Skill", 0, log));
+                        result.logEvents.add(new BattleLogEvent(Type.SKILL, actorId, "Skill", 0, log));
                     }
                     hero.castingSkillId = null;
                 } else {
@@ -188,7 +188,7 @@ public class BattleEngine {
             
             // 用户发起施法 (ActionType.SKILL)
             boolean userCast = (actor.side == state.sideA && cmd.type == TurnCommand.ActionType.SKILL && hero.skillCd <= 0);
-            boolean aiCast = (actor.side == state.sideB && skillResolver.decideSkill(state, actor.side).type == SkillResolver.SkillDecision.Type.SKILL);
+            boolean aiCast = (actor.side == state.sideB && skillResolver.decideSkill(state, actor.side).type == SkillResolver.SkillDecision.Type.SKILL_A);
             
             if (userCast || aiCast) {
                 // 进入蓄力状态 (1回合延迟)
