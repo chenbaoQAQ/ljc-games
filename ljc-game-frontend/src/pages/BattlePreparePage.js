@@ -142,6 +142,17 @@ export function BattlePreparePage(container, params) {
         updateCapacity();
     }
 
+    // Local definitions
+    const TROOP_DEFS = {
+        2001: { name: '步兵(INF)' },
+        2002: { name: '弓兵(ARC)' },
+        2003: { name: '骑兵(CAV)' },
+        3001: { name: '诸葛连弩(CN)' },
+        3002: { name: '鬼武者(JP)' },
+        3003: { name: '花郎箭手(KR)' },
+        3004: { name: '皇家骑士(GB)' },
+    };
+
     function renderTroops() {
         if (!selectedGeneralId) return;
         const list = document.getElementById('troops-list');
@@ -152,13 +163,17 @@ export function BattlePreparePage(container, params) {
         }
 
         list.innerHTML = userTroops.map(t => {
+            const def = TROOP_DEFS[t.troopId] || { name: `未知兵种` };
             const currentVal = troopConfig[t.troopId] || 0;
+            // Use t.count instead of t.totalCount (backend field name mismatch)
+            const total = t.count || 0;
+
             return `
             <div class="troop-row">
-               <div class="t-name">${t.name} (余:${t.totalCount})</div>
+               <div class="t-name">${def.name} (余:${total})</div>
                <div class="t-control">
                   <button class="btn-tiny btn-minus" data-id="${t.troopId}">-10</button>
-                  <input type="number" class="troop-input" id="input-${t.troopId}" value="${currentVal}" max="${t.totalCount}" min="0">
+                  <input type="number" class="troop-input" id="input-${t.troopId}" value="${currentVal}" max="${total}" min="0">
                   <button class="btn-tiny btn-plus" data-id="${t.troopId}">+10</button>
                </div>
             </div>
@@ -172,6 +187,7 @@ export function BattlePreparePage(container, params) {
 
             input.onchange = (e) => {
                 let val = parseInt(e.target.value) || 0;
+                // Fix updateConfig to use t.count
                 updateConfig(t.troopId, val);
             };
         });
@@ -198,7 +214,8 @@ export function BattlePreparePage(container, params) {
         if (!troop) return;
 
         // Clamp
-        val = Math.max(0, Math.min(val, troop.totalCount));
+        const max = troop.count || 0;
+        val = Math.max(0, Math.min(val, max));
         troopConfig[troopId] = val;
 
         const input = document.getElementById('input-' + troopId);
