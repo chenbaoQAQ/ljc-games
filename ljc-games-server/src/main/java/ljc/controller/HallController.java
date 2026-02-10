@@ -101,12 +101,12 @@ public class HallController {
     }
 
     @GetMapping("/generals")
-    public Result<java.util.List<ljc.entity.UserGeneralTbl>> getGenerals(@RequestParam Long userId) {
+    public Result<java.util.List<ljc.dto.UserGeneralVO>> getGenerals(@RequestParam Long userId) {
         return Result.success(hallService.getGenerals(userId));
     }
 
     @GetMapping("/equipments")
-    public Result<java.util.List<ljc.entity.UserEquipmentTbl>> getEquipments(@RequestParam Long userId) {
+    public Result<java.util.List<ljc.dto.UserEquipmentVO>> getEquipments(@RequestParam Long userId) {
         return Result.success(hallService.getEquipments(userId));
     }
 

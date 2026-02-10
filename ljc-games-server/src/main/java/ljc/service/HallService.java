@@ -30,6 +30,7 @@ public class HallService {
 
     private final UserTroopMapper userTroopMapper;
     private final TroopTemplateMapper troopTemplateMapper;
+    private final SkillTemplateMapper skillTemplateMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public void upgradeGeneral(Long userId, Long generalId) {
@@ -53,10 +54,11 @@ public class HallService {
 
         general.setLevel(general.getLevel() + 1);
         
-        // 简单属性成长：每级 HP + 50
+        // 简单属性成长：每级 HP + 50, 统率 + 1
         // 实际项目应读配置表成长系数
         general.setMaxHp(general.getMaxHp() + 50);
         general.setCurrentHp(general.getMaxHp()); 
+        general.setCapacity(general.getCapacity() + 1); 
 
         userGeneralMapper.update(general);
     }
@@ -440,20 +442,128 @@ public class HallService {
         userGeneralMapper.update(general);
     }
 
-    public List<UserGeneralTbl> getGenerals(Long userId) {
-        return userGeneralMapper.selectByUserId(userId);
+    public java.util.List<ljc.dto.UserGeneralVO> getGenerals(Long userId) {
+        List<UserGeneralTbl> list = userGeneralMapper.selectByUserId(userId);
+        List<ljc.dto.UserGeneralVO> result = new ArrayList<>();
+        
+        List<UserEquipmentTbl> allEquips = userEquipmentMapper.selectByUserId(userId);
+        List<UserGemTbl> allGems = userGemMapper.selectByUserId(userId);
+
+        for (UserGeneralTbl g : list) {
+            ljc.dto.UserGeneralVO vo = new ljc.dto.UserGeneralVO();
+            vo.setId(g.getId());
+            vo.setUserId(g.getUserId());
+            vo.setTemplateId(g.getTemplateId());
+            vo.setLevel(g.getLevel());
+            vo.setTier(g.getTier());
+            vo.setUnlocked(g.getUnlocked());
+            vo.setActivated(g.getActivated());
+            vo.setCurrentHp(g.getCurrentHp()); // Need to cap at maxHp?
+            
+            // Templates
+            GeneralTemplateTbl gt = generalTemplateMapper.selectById(g.getTemplateId());
+            if (gt != null) {
+                vo.setName(gt.getName());
+                // Base Stats
+                int baseHp = (gt.getBaseHp() != null ? gt.getBaseHp() : 500) + (g.getLevel() - 1) * 50; 
+                // Capacity: Base + Level
+                int cap = (gt.getBaseCapacity() != null ? gt.getBaseCapacity() : 5) + (g.getLevel() - 1);
+                // ATK: Base + (Level-1)*5
+                int atk = (gt.getBaseAtk() != null ? gt.getBaseAtk() : 50) + (g.getLevel() - 1) * 5;
+                
+                // Equipments Bonus
+                for (UserEquipmentTbl eq : allEquips) {
+                    if (g.getId().equals(eq.getGeneralId())) {
+                        EquipmentTemplateTbl et = equipmentTemplateMapper.selectById(eq.getTemplateId());
+                        if (et != null) {
+                            // Base from Equip
+                            atk += (et.getBaseAtk() != null ? et.getBaseAtk().intValue() : 0);
+                            baseHp += (et.getBaseHp() != null ? et.getBaseHp().intValue() : 0);
+                            
+                            // Enhance Bonus: +10% per level? Or flat?
+                            // Simple: +Level * 10 ATK/HP
+                            int elv = eq.getEnhanceLevel();
+                            atk += elv * 10;
+                            baseHp += elv * 50;
+                        }
+                        
+                        // Gem Bonus
+                        // Check socket1/2
+                        if (eq.getSocket1GemId() != null) {
+                            // Find gem
+                            UserGemTbl gem = allGems.stream().filter(x -> x.getId().equals(eq.getSocket1GemId())).findFirst().orElse(null);
+                            if (gem != null) {
+                                if ("ATK".equals(gem.getGemType())) atk += gem.getStatValue().intValue();
+                                if ("HP".equals(gem.getGemType())) baseHp += gem.getStatValue().intValue();
+                            }
+                        }
+                        if (eq.getSocket2GemId() != null) {
+                             UserGemTbl gem = allGems.stream().filter(x -> x.getId().equals(eq.getSocket2GemId())).findFirst().orElse(null);
+                            if (gem != null) {
+                                if ("ATK".equals(gem.getGemType())) atk += gem.getStatValue().intValue();
+                                if ("HP".equals(gem.getGemType())) baseHp += gem.getStatValue().intValue();
+                            }
+                        }
+                    }
+                }
+                
+                vo.setMaxHp(baseHp);
+                vo.setAtk(atk);
+                vo.setCapacity(cap);
+            }
+            
+            // Skill
+            UserGeneralSkillTbl skillLink = userGeneralSkillMapper.selectByGeneralId(g.getId());
+            if (skillLink != null) {
+                SkillTemplateTbl st = skillTemplateMapper.selectById(skillLink.getCurrentSkillId());
+                if (st != null) {
+                    vo.setCurrentSkillId(st.getId());
+                    vo.setSkillName(st.getName());
+                    vo.setSkillDesc(st.getDescription());
+                }
+            } else {
+                // Default Skill?
+                vo.setSkillName("无技能");
+                vo.setSkillDesc("暂未学习技能");
+            }
+            
+            result.add(vo);
+        }
+        return result;
     }
 
-    public List<UserCivProgressTbl> getProgress(Long userId) {
-        return userCivProgressMapper.selectByUserId(userId);
-    }
-
-    public List<UserEquipmentTbl> getEquipments(Long userId) {
-        return userEquipmentMapper.selectByUserId(userId);
+    public java.util.List<ljc.dto.UserEquipmentVO> getEquipments(Long userId) {
+        List<UserEquipmentTbl> list = userEquipmentMapper.selectByUserId(userId);
+        List<ljc.dto.UserEquipmentVO> result = new ArrayList<>();
+        for (UserEquipmentTbl e : list) {
+             ljc.dto.UserEquipmentVO vo = new ljc.dto.UserEquipmentVO();
+             vo.setId(e.getId());
+             vo.setUserId(e.getUserId());
+             vo.setTemplateId(e.getTemplateId());
+             vo.setEnhanceLevel(e.getEnhanceLevel());
+             vo.setGeneralId(e.getGeneralId());
+             vo.setIsLocked(e.getIsLocked());
+             vo.setSocket1GemId(e.getSocket1GemId());
+             vo.setSocket2GemId(e.getSocket2GemId());
+             
+             EquipmentTemplateTbl tpl = equipmentTemplateMapper.selectById(e.getTemplateId());
+             if (tpl != null) {
+                 vo.setName(tpl.getName());
+                 vo.setSlot(tpl.getSlot());
+                 vo.setBaseAtk(tpl.getBaseAtk());
+                 vo.setBaseHp(tpl.getBaseHp());
+             }
+             result.add(vo);
+        }
+        return result;
     }
 
     public List<UserGemTbl> getGems(Long userId) {
         return userGemMapper.selectByUserId(userId);
+    }
+
+    public List<UserCivProgressTbl> getProgress(Long userId) {
+        return userCivProgressMapper.selectByUserId(userId);
     }
 
     public List<UserInventoryTbl> getItems(Long userId) {
