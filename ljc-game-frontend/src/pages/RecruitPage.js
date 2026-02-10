@@ -216,47 +216,6 @@ export function RecruitPage(container) {
     });
   }
 
-  // --- 数量加减按钮 ---
-  document.querySelectorAll('.qty-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const input = btn.closest('.recruit-controls').querySelector('.recruit-input');
-      const delta = parseInt(btn.dataset.delta);
-      let val = parseInt(input.value) || 0;
-      val = Math.max(1, val + delta);
-      input.value = val;
-    });
-  });
-
-  // --- 招募 ---
-  document.querySelectorAll('.recruit-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const troopId = parseInt(btn.dataset.troopId);
-      const input = document.getElementById(`qty - ${troopId}`);
-      const count = parseInt(input.value) || 0;
-      if (count <= 0) { showToast('请输入招募数量', 'error'); return; }
-
-      const troopInfo = troops.find(t => t.troopId === troopId);
-      btn.disabled = true;
-      btn.textContent = '招募中...';
-      try {
-        const result = await hallAPI.recruit(userId, troopId, count);
-        console.log('招募结果:', result);
-        if (result.code === 200) {
-          showToast(`招募成功！+${count} ${troopInfo.name}`, 'success');
-          loadData();
-        } else {
-          showToast(result.message || '招募失败', 'error');
-        }
-      } catch (e) {
-        const msg = (typeof e.message === 'string') ? e.message : '招募失败';
-        showToast(msg, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = `招募${troopInfo.name}`;
-      }
-    });
-  });
-
   // --- 返回 ---
   document.getElementById('back-btn').addEventListener('click', () => {
     router.navigate('/hall');

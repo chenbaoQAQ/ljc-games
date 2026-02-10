@@ -1,4 +1,4 @@
-import { hallAPI, troopAPI, battleAPI } from '../api/index.js';
+import { hallAPI, playerAPI, battleAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
 
 export function BattlePreparePage(container, params) {
@@ -86,17 +86,17 @@ export function BattlePreparePage(container, params) {
 
     async function init() {
         try {
-            const [gRes, tRes] = await Promise.all([
+            const [gRes, pRes] = await Promise.all([
                 hallAPI.getGenerals(userId),
-                troopAPI.getTroops(userId)
+                playerAPI.getInfo(userId)
             ]);
 
             if (gRes.code === 200) {
                 generals = gRes.data.filter(g => g.activated);
                 renderGenerals();
             }
-            if (tRes.code === 200) {
-                userTroops = tRes.data || [];
+            if (pRes.code === 200 && pRes.data.troops) {
+                userTroops = pRes.data.troops || [];
             }
         } catch (e) { console.error(e); }
     }
@@ -167,7 +167,7 @@ export function BattlePreparePage(container, params) {
 
         // Bind events
         userTroops.forEach(t => {
-            const input = document.getElementById(`input-${t.troopId}`);
+            const input = document.getElementById('input-' + t.troopId);
             if (!input) return;
 
             input.onchange = (e) => {
@@ -201,7 +201,7 @@ export function BattlePreparePage(container, params) {
         val = Math.max(0, Math.min(val, troop.totalCount));
         troopConfig[troopId] = val;
 
-        const input = document.getElementById(`input-${troopId}`);
+        const input = document.getElementById('input-' + troopId);
         if (input) input.value = val;
 
         updateCapacity();
