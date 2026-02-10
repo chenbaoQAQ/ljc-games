@@ -2,10 +2,10 @@ import { hallAPI, playerAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
 
 export function EquipmentPage(container) {
-    const userId = localStorage.getItem('userId');
-    if (!userId) { router.navigate('/login'); return; }
+  const userId = localStorage.getItem('userId');
+  if (!userId) { router.navigate('/login'); return; }
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div class="equipment-page">
       <nav class="page-nav">
         <button class="btn btn-secondary btn-sm" id="back-btn">← 返回大厅</button>
@@ -21,8 +21,8 @@ export function EquipmentPage(container) {
     </div>
   `;
 
-    const style = '...' + // 复用之前的样式
-        `
+  const style = '...' + // 复用之前的样式
+    `
     .equipment-page {
       min-height: 100vh;
       background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-medium) 100%);
@@ -73,33 +73,33 @@ export function EquipmentPage(container) {
     .toast.error { background: var(--danger-color); color: #fff; }
   `;
 
-    const styleEl = document.createElement('style');
-    styleEl.textContent = style;
-    document.head.appendChild(styleEl);
+  const styleEl = document.createElement('style');
+  styleEl.textContent = style;
+  document.head.appendChild(styleEl);
 
-    loadData();
+  loadData();
 
-    async function loadData() {
-        try {
-            const [equipRes, playerRes] = await Promise.all([
-                hallAPI.getEquipments(userId),
-                playerAPI.getInfo(userId)
-            ]);
+  async function loadData() {
+    try {
+      const [equipRes, playerRes] = await Promise.all([
+        hallAPI.getEquipments(userId),
+        playerAPI.getInfo(userId)
+      ]);
 
-            if (playerRes.code === 200 && playerRes.data) {
-                document.getElementById('gold-display').textContent = (playerRes.data.gold || 0).toLocaleString();
-            }
+      if (playerRes.code === 200 && playerRes.data) {
+        document.getElementById('gold-display').textContent = (playerRes.data.gold || 0).toLocaleString();
+      }
 
-            const list = document.getElementById('equip-list');
-            if (equipRes.code === 200 && equipRes.data && equipRes.data.length > 0) {
-                list.innerHTML = equipRes.data.map(e => {
-                    const lv = e.enhanceLevel || 0;
-                    const cost = (lv + 1) * 100;
-                    // 简单的名字判断
-                    const name = (e.templateId === 1) ? '铁剑' : (e.templateId === 2) ? '皮甲' : `装备#${e.templateId}`;
-                    const icon = (e.templateId === 1) ? '⚔️' : '🛡️';
+      const list = document.getElementById('equip-list');
+      if (equipRes.code === 200 && equipRes.data && equipRes.data.length > 0) {
+        list.innerHTML = equipRes.data.map(e => {
+          const lv = e.enhanceLevel || 0;
+          const cost = (lv + 1) * 100;
+          // 简单的名字判断
+          const name = (e.templateId === 1) ? '铁剑' : (e.templateId === 2) ? '皮甲' : `装备#${e.templateId}`;
+          const icon = (e.templateId === 1) ? '⚔️' : '🛡️';
 
-                    return `
+          return `
            <div class="equip-card">
              <div class="ec-top">
                <div class="ec-icon">${icon}</div>
@@ -112,40 +112,43 @@ export function EquipmentPage(container) {
              <button class="btn btn-primary enhance-btn" data-id="${e.id}" data-cost="${cost}">强化</button>
            </div>
            `;
-                }).join('');
+        }).join('');
 
-                list.querySelectorAll('.enhance-btn').forEach(btn => {
-                    btn.addEventListener('click', () => enhance(btn.dataset.id, btn.dataset.cost));
-                });
-            } else {
-                list.innerHTML = '<p style="text-align:center;grid-column:1/-1;">暂无装备</p>';
-            }
-        } catch (e) {
-            console.error(e);
-        }
+        list.querySelectorAll('.enhance-btn').forEach(btn => {
+          btn.addEventListener('click', () => enhance(btn.dataset.id, btn.dataset.cost));
+        });
+      } else {
+        list.innerHTML = '<p style="text-align:center;grid-column:1/-1;">暂无装备</p>';
+      }
+    } catch (e) {
+      console.error(e);
     }
+  }
 
-    async function enhance(id, cost) {
-        if (!confirm(`确认消耗 ${cost} 金币强化装备吗？\n(+3以上可能会失败掉级)`)) return;
-        try {
-            const res = await hallAPI.enhanceEquipment(userId, id);
-            if (res.code === 200) {
-                showToast('强化成功！', 'success');
-                loadData();
-            } else {
-                showToast(res.message || '强化失败', 'error');
-            }
-        } catch (e) {
-            showToast(e.message || '操作失败', 'error');
-        }
+  async function enhance(id, cost) {
+    if (!confirm(`确认消耗 ${cost} 金币强化装备吗？\n(+3以上可能会失败掉级)`)) return;
+    try {
+      const res = await hallAPI.enhanceEquipment(userId, id);
+      if (res.code === 200) {
+        // 后端现在返回具体的消息（成功或失败掉级）
+        const msg = res.data;
+        const isFail = msg.includes("失败");
+        showToast(msg, isFail ? 'error' : 'success');
+        loadData();
+      } else {
+        showToast(res.message || '强化失败', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || '操作失败', 'error');
     }
+  }
 
-    function showToast(msg, type = 'success') {
-        const toast = document.getElementById('toast');
-        toast.textContent = msg;
-        toast.className = `toast ${type} show`;
-        setTimeout(() => { toast.className = 'toast'; }, 2000);
-    }
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = `toast ${type} show`;
+    setTimeout(() => { toast.className = 'toast'; }, 2000);
+  }
 
-    document.getElementById('back-btn').addEventListener('click', () => router.navigate('/hall'));
+  document.getElementById('back-btn').addEventListener('click', () => router.navigate('/hall'));
 }

@@ -171,12 +171,11 @@ public class HallService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void enhanceEquipment(Long userId, Long equipmentId) {
+    public String enhanceEquipment(Long userId, Long equipmentId) {
         UserEquipmentTbl equip = userEquipmentMapper.selectById(equipmentId);
         if (equip == null || !equip.getUserId().equals(userId)) {
             throw new RuntimeException("装备不存在");
         }
-        
         
         int currentLevel = (equip.getEnhanceLevel() == null) ? 0 : equip.getEnhanceLevel();
         // Cost: (currentLevel + 1) * 100
@@ -190,38 +189,33 @@ public class HallService {
         // V2.8 Logic: 
         // +0 -> +1 to +3: 100% Success
         // +3 -> +4 and above: Chance to fail.
-        // Fail: Drop 1 level (min +0).
         
-        boolean success = true;
+        // Base success rate logic
+        int successRate = 100;
         if (currentLevel >= 3) {
-            // Simple logic: 80% at 3->4, 70% at 4->5, etc. Min 10%.
-            // Base chance 90 - (level-3)*10 ?
             // Level 3->4: 90%
             // Level 4->5: 80%
             // ...
-            int chance = 90 - (currentLevel - 3) * 10;
-            if (chance < 10) chance = 10;
-            
-            // Roll
-            int roll = new java.util.Random().nextInt(100);
-            success = roll < chance;
+            successRate = 90 - (currentLevel - 3) * 10;
+            if (successRate < 10) successRate = 10;
         }
+
+        // Roll
+        int roll = new java.util.Random().nextInt(100); // 0-99
+        boolean success = roll < successRate;
 
         if (success) {
             equip.setEnhanceLevel(currentLevel + 1);
             userEquipmentMapper.update(equip);
-            // Can throw exception with specific message or return Result object if we change return type?
-            // Controller returns Result<String>. 
-            // We can't easily return distinction here without changing signature.
-            // For now, let's just complete.
+            return "强化成功！当前等级 +" + (currentLevel + 1);
         } else {
-            // Fail: Drop 1 level
+            // Fail: Drop 1 level (if > 0)
             if (currentLevel > 0) {
                 equip.setEnhanceLevel(currentLevel - 1);
                 userEquipmentMapper.update(equip);
-                throw new RuntimeException("强化失败！装备等级下降到 +" + (currentLevel - 1));
+                return "强化失败！装备等级下降到 +" + (currentLevel - 1);
             } else {
-                throw new RuntimeException("强化失败！(等级保持 +0)");
+                return "强化失败！(等级保持 +0)";
             }
         }
     }
