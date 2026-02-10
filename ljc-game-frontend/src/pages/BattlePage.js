@@ -214,29 +214,53 @@ export function BattlePage(container, params) {
             return;
         }
 
-        const isPlayerTurn = battleState.nextActorDesc === 'HeroA';
+        const nextActor = battleState.nextActorDesc || '';
+        const isMyTurn = nextActor === 'HeroA' || nextActor.endsWith('_A');
+        const isMyHero = nextActor === 'HeroA';
+
         const statusEl = document.getElementById('action-status');
         const btnGroup = document.getElementById('action-buttons');
+        const btnAttack = document.getElementById('btn-attack');
+        const btnSkill = document.getElementById('btn-skill');
 
-        if (isPlayerTurn) {
+        if (isMyTurn) {
             statusEl.style.display = 'none';
             btnGroup.style.display = 'flex';
 
-            document.getElementById('btn-attack').onclick = () => doTurn(false);
-            document.getElementById('btn-skill').onclick = () => doTurn(true);
+            // Set button text/visibility based on actor
+            if (isMyHero) {
+                btnAttack.textContent = '⚔️ 主公攻击';
+                btnSkill.style.display = 'inline-block';
+                btnAttack.onclick = () => doTurn(false);
+                btnSkill.onclick = () => doTurn(true);
+            } else {
+                // Troop Turn
+                const troopType = nextActor.split('_')[0];
+                const troopName = getTroopName(troopType);
+                btnAttack.textContent = `⚔️ ${troopName}进攻`;
+                btnSkill.style.display = 'none';
+                btnAttack.onclick = () => doTurn(false);
+            }
         } else {
             statusEl.style.display = 'block';
             btnGroup.style.display = 'none';
 
-            let desc = battleState.nextActorDesc || 'Wait';
-            if (desc === 'HeroB') desc = 'Enemy Hero';
-            statusEl.textContent = `${desc} acting...`;
+            let desc = nextActor;
+            if (desc === 'HeroB') desc = '敌方主将';
+            else if (desc.endsWith('_B')) desc = '敌方' + getTroopName(desc.split('_')[0]);
 
-            // Auto advance (slowed down for visibility)
+            statusEl.textContent = `${desc} 行动中...`;
+
+            // Auto advance
             if (!isProcessing) {
                 setTimeout(() => doTurn(false), 800);
             }
         }
+    }
+
+    function getTroopName(type) {
+        const map = { 'INF': '步兵', 'ARC': '弓兵', 'CAV': '骑兵' };
+        return map[type] || type;
     }
 
     async function doTurn(castSkill) {
