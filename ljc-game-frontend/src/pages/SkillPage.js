@@ -89,6 +89,7 @@ export function SkillPage(container) {
             items = (itemRes.code === 200) ? itemRes.data : [];
 
             renderGenerals();
+            renderBooks();
         } catch (e) { console.error(e); }
     }
 
