@@ -142,21 +142,16 @@ public class BattleEngine {
     private void executeAction(BattleState state, Actor actor, TurnCommand cmd, TurnResult result) {
         
         // 0. Round 开始统一结算 DoT/HoT 的逻辑
-        // 如果是新的一轮开始 (index=0)
-        // 注意：executeAction 是在 processTurn 内部调用的，此时 index 还没加1
         if (state.currentActorIndex == 0) {
             StatusLogic.processPhaseStart(state, null, result.logEvents);
         }
 
-        // Log Actor Chosen
-        String actorId = actor.isHero ? (actor.side == state.sideA ? "HeroA" : "HeroB") : actor.troop.type + (actor.side == state.sideA ? "_A" : "_B");
+        String actorId = actor.isHero ? (actor.side == state.sideA ? "HeroA" : "HeroB") 
+                                      : actor.troop.type + (actor.side == state.sideA ? "_A" : "_B");
         result.logEvents.add(new BattleLogEvent(Type.ACTOR_CHOSEN, actorId, null, 0, "Turn Start"));
         
-        // 1. Check Stun
         if (isActorStunned(state, actor)) {
              result.logEvents.add(new BattleLogEvent(Type.STUN_SKIP, actorId, null, 0, "Stunned, Turn Skipped"));
-             
-             // Consume Stun Here (Duration logic moved from Round End)
              consumeStun(state, actor);
              return; 
         }
@@ -164,37 +159,46 @@ public class BattleEngine {
         // 英雄行动
         if (actor.isHero) {
             Hero hero = actor.side.hero;
-            if (!hero.isAlive()) {
-                return;
+            if (!hero.isAlive()) return;
+            
+            // 更新战术指令
+            if (cmd.tactics != null && !cmd.tactics.isEmpty()) {
+                hero.tactics = cmd.tactics;
             }
             
+            // 判定延迟技能生效
+            if (hero.castingSkillTurns > 0) {
+                hero.castingSkillTurns--;
+                if (hero.castingSkillTurns <= 0) {
+                    // 技能爆发！
+                    SkillResolver.SkillDecision decision = new SkillResolver.SkillDecision(SkillResolver.SkillDecision.Type.SKILL);
+                    SkillResolver.SkillEffect effect = skillResolver.resolve(state, decision);
+                    for (String log : effect.logs) {
+                        result.logEvents.add(new BattleLogEvent(Type.ATTACK, actorId, "Skill", 0, log));
+                    }
+                    hero.castingSkillId = null;
+                } else {
+                    result.logEvents.add(new BattleLogEvent(Type.SKILL_CAST, actorId, null, 0, "正在蓄力..."));
+                }
+                return; // 蓄力/施法中不普攻
+            }
+
             // AMBUSH_VOLLEY Hook
             checkAmbushVolley(state, actor.side, getEnemySide(state, actor.side), result);
             
-            // 判定技能
-            SkillResolver.SkillDecision decision;
-            if (actor.side == state.sideA) {
-                // 玩家
-                if (cmd.type == TurnCommand.ActionType.SKILL) {
-                   decision = skillResolver.decideSkill(state, actor.side);
-                } else {
-                   decision = new SkillResolver.SkillDecision(SkillResolver.SkillDecision.Type.NORMAL);
-                }
+            // 用户发起施法 (ActionType.SKILL)
+            boolean userCast = (actor.side == state.sideA && cmd.type == TurnCommand.ActionType.SKILL && hero.skillCd <= 0);
+            boolean aiCast = (actor.side == state.sideB && skillResolver.decideSkill(state, actor.side).type == SkillResolver.SkillDecision.Type.SKILL);
+            
+            if (userCast || aiCast) {
+                // 进入蓄力状态 (1回合延迟)
+                hero.castingSkillTurns = 1; 
+                hero.skillCd = hero.maxSkillCd;
+                result.logEvents.add(new BattleLogEvent(Type.SKILL_CAST, actorId, null, 0, "开始施法准备!"));
+                // 本回合动作结束
             } else {
-                // 敌方(AI)
-                decision = skillResolver.decideSkill(state, actor.side);
-            }
-
-            // 执行
-            if (decision.type == SkillResolver.SkillDecision.Type.NORMAL) {
+                // 自动普攻
                 performHeroAttack(state, actor.side, getEnemySide(state, actor.side), result);
-            } else {
-                // 技能逻辑
-                SkillResolver.SkillEffect effect = skillResolver.resolve(state, decision);
-                // Merge logs
-                for (String log : effect.logs) {
-                    result.logEvents.add(new BattleLogEvent(Type.ATTACK, actorId, "Skill", 0, log));
-                }
             }
 
         } else {
@@ -253,15 +257,29 @@ public class BattleEngine {
              }
         }
     }
-    
-    // 兵种普攻
+
+    // 兵种普攻 (增强版：支持战术 + 武将参战)
     private void performTroopAttack(BattleState state, Side attackerSide, Side defenderSide, TroopStack attackerStack, TurnResult result) {
         int unitAtk = 10; 
         int totalRawDmg = attackerStack.count * unitAtk;
         
-        String targetType = getCounterTargetType(attackerStack.type);
-        TroopStack targetStack = findStack(defenderSide, targetType);
+        // 1. 寻找目标 (基于战术)
+        TroopStack targetStack = null;
+        String tactics = attackerSide.hero.tactics; // e.g. "TARGET_ARC"
         
+        if (tactics != null && !tactics.isEmpty() && !tactics.equals("DEFAULT")) {
+             // Try find specific target
+             String preferType = tactics.replace("TARGET_", ""); // "ARC"
+             targetStack = findStack(defenderSide, preferType);
+        }
+        
+        // Fallback: Counter Type
+        if (targetStack == null || targetStack.count <= 0) {
+             String targetType = getCounterTargetType(attackerStack.type);
+             targetStack = findStack(defenderSide, targetType);
+        }
+        
+        // Fallback: Helper Logic (Priority List)
         if (targetStack == null || targetStack.count <= 0) {
             List<TroopStack> targets = getTargetTroopsByPriority(defenderSide);
             for (TroopStack t : targets) {
@@ -272,11 +290,13 @@ public class BattleEngine {
             }
         }
         
-        if (targetStack == null || targetStack.count <= 0) return;
+        if (targetStack == null || targetStack.count <= 0) return; // No targets
         
+        // 2. 计算兵种克制 + 伤害
         double mult = computeTypeMultiplier(attackerStack.type, targetStack.type);
         int finalDmg = (int)(totalRawDmg * mult);
         
+        // Commit troops (Spillover logic)
         List<TroopStack> commitChain = new ArrayList<>();
         commitChain.add(targetStack);
         List<TroopStack> others = getTargetTroopsByPriority(defenderSide);
@@ -296,6 +316,19 @@ public class BattleEngine {
              
              remainingDmg = outcome.overflowDamage;
              if (remainingDmg <= 0) break;
+        }
+        
+        // 3. 武将参战 (Assist)
+        // 逻辑：如果武将存活且未被控制，追加一次 20% 攻击力的伤害给当前目标
+        if (attackerSide.hero.isAlive() && !isActorStunned(state, new Actor(attackerSide, true, null))) {
+            int assistDmg = (int)(attackerSide.hero.atk * 0.2); // 20% ATK
+            if (assistDmg > 0 && targetStack.count > 0) { // Still alive?
+                 TroopDamage.DamageOutcome outcome = TroopDamage.applyDamage(targetStack, assistDmg);
+                 result.logEvents.add(new BattleLogEvent(Type.ASSIST_ATK, attackerSide.hero.name, targetStack.type, assistDmg, "统帅追击"));
+                 if (outcome.killedCount > 0) {
+                     result.logEvents.add(new BattleLogEvent(Type.KILL, attackerSide.hero.name, targetStack.type, outcome.killedCount, "Assist Kill"));
+                 }
+            }
         }
     }
     

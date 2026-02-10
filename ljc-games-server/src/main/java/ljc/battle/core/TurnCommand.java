@@ -13,6 +13,7 @@ public class TurnCommand {
     public ActionType type;
     public String target; // 目标ID（若有手动选择）
     public boolean isAi;  // 是否AI
+    public String tactics; // 战术策略: TARGET_INF, TARGET_ARC, TARGET_CAV
 
     public TurnCommand() {}
 

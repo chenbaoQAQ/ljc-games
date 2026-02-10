@@ -137,52 +137,36 @@ public class BattleService {
 
     // --- Process Turn ---
     @Transactional(rollbackFor = Exception.class)
-    public BattleContext processTurn(Long userId, Boolean castSkill, Integer clientTurnNo) {
-        // Note: Returning BattleContext for frontend compatibility. 
-        // Ideally frontend should adapt to TurnResult or BattleState.
-        // For now, I will map BattleState -> BattleContext Structure broadly or just return state wrapped.
+    public BattleContext processTurn(Long userId, Boolean castSkill, Integer clientTurnNo, String tactics) {
+        // Note: Returning BattleContext
         
         // 1. Get Session
         BattleSessionTbl session = battleSessionMapper.selectByUserId(userId);
         if (session == null || session.getStatus() != 0) {
             throw new RuntimeException("没有进行中的战斗");
         }
-
-        // 2. Load State
+        
+        // ... (lines 143-167 same) ... 
         BattleState state;
         try {
             state = objectMapper.readValue(session.getContextJson(), BattleState.class);
         } catch (Exception e) {
             throw new RuntimeException("Context Error", e);
         }
-
-        // 3. Construct Command
-        // Frontend sends "castSkill" boolean.
-        // Construct TurnCommand compatible with Engine.
-        // Engine expects sequence of commands.
-        // But Frontend is "One Click Turn".
-        // V1 Engine requires iterative calls for each actor action.
-        // Service needs to LOOP until Round Ends or Player Input required?
-        // IF we want "One Click = One Round":
-        //    Loop Engine.processTurn until state.currentActorIndex == 0 (Round Reset) AND some log exists.
         
-        // 幂等校验：clientTurnNo 必须 == session.currentTurn + 1
         if (clientTurnNo != null) {
             int expectedTurn = session.getCurrentTurn() + 1;
             if (clientTurnNo != expectedTurn) {
-                // 不匹配 → 返回当前状态，不推进
                 return convertToContext(state, session.getBattleId(), new ArrayList<>());
             }
         }
 
         TurnCommand cmd = new TurnCommand();
         cmd.clientTurnNo = state.turnNo + 1;
+        cmd.tactics = tactics; // Set Tactics
+        
         if (Boolean.TRUE.equals(castSkill)) {
             cmd.type = TurnCommand.ActionType.SKILL; 
-            // Only effective if it's Player's Turn?
-            // Engine checks currentActor. 
-            // If currentActor is Player Hero -> Apply Skill.
-            // If currentActor is Troop -> Skill flag ignored (Normal Attack).
         } else {
             cmd.type = TurnCommand.ActionType.NORMAL;
         }

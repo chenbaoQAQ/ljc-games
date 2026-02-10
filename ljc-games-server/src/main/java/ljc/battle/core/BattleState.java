@@ -63,6 +63,11 @@ public class BattleState {
         // 技能CD相关
         public int skillCd; // 剩余CD
         public int maxSkillCd; // 技能最大CD
+        
+        // 延迟技能机制 (V2)
+        public String castingSkillId; // 正在吟唱/准备的技能
+        public int castingSkillTurns; // 剩余吟唱回合
+        public String tactics;        // 当前战术指令 (TARGET_INF, ETC)
 
         public Hero() {
             passives = new ArrayList<>();

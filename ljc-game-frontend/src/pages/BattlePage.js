@@ -56,14 +56,21 @@ export function BattlePage(container, params) {
          <div class="logs-content" id="logs-content"></div>
       </div>
 
-      <!-- 操作栏 -->
-      <div class="action-bar" id="action-bar">
-         <div class="action-status" id="action-status">正在初始化...</div>
-         <div class="action-buttons" id="action-buttons" style="display:none">
-            <button class="btn btn-primary" id="btn-attack">⚔️ 普通攻击</button>
-            <button class="btn btn-accent" id="btn-skill">✨ 释放技能</button>
-         </div>
-      </div>
+       <!-- 操作栏 -->
+       <div class="action-bar" id="action-bar" style="flex-direction:column;gap:10px;height:auto;padding:10px;">
+          <div class="tactics-group" style="display:flex;gap:15px;color:#aaa;font-size:0.9rem;">
+              <span style="color:#ffd700">战术:</span>
+              <label><input type="radio" name="tactics" value="" checked>默认</label>
+              <label><input type="radio" name="tactics" value="TARGET_INF">攻步</label>
+              <label><input type="radio" name="tactics" value="TARGET_ARC">攻弓</label>
+              <label><input type="radio" name="tactics" value="TARGET_CAV">攻骑</label>
+          </div>
+          <div class="action-status" id="action-status">正在初始化...</div>
+          <div class="action-buttons" id="action-buttons" style="display:none">
+             <button class="btn btn-primary" id="btn-attack">⚔️ 普通攻击</button>
+             <button class="btn btn-accent" id="btn-skill">✨ 释放技能</button>
+          </div>
+       </div>
       
       <!-- 结算弹窗 -->
       <div class="result-modal" id="result-modal" style="display:none">
@@ -134,6 +141,12 @@ export function BattlePage(container, params) {
     #result-title { font-size: 2rem; margin-bottom: 10px; color: var(--accent-color); }
   `;
     document.head.appendChild(style);
+
+    // Tactics
+    let currentTactics = "";
+    container.querySelectorAll('input[name="tactics"]').forEach(input => {
+        input.addEventListener('change', (e) => currentTactics = e.target.value);
+    });
 
     // Mod: Only resume battle. New battles are started in BattlePreparePage.
     resumeBattle();
@@ -227,12 +240,20 @@ export function BattlePage(container, params) {
             statusEl.style.display = 'none';
             btnGroup.style.display = 'flex';
 
-            // Set button text/visibility based on actor
             if (isMyHero) {
-                btnAttack.textContent = '⚔️ 主公攻击';
-                btnSkill.style.display = 'inline-block';
-                btnAttack.onclick = () => doTurn(false);
-                btnSkill.onclick = () => doTurn(true);
+                // Check Casting State
+                const hero = battleState.sideA.hero;
+                if (hero.castingSkillTurns > 0) {
+                    btnAttack.textContent = `⏳ 蓄力中... (剩${hero.castingSkillTurns}回合)`;
+                    btnSkill.style.display = 'none';
+                    btnAttack.onclick = () => doTurn(false);
+                } else {
+                    btnAttack.textContent = '⚔️ 主公普攻';
+                    btnSkill.textContent = '✨ 蓄力技能';
+                    btnSkill.style.display = 'inline-block';
+                    btnAttack.onclick = () => doTurn(false);
+                    btnSkill.onclick = () => doTurn(true);
+                }
             } else {
                 // Troop Turn
                 const troopType = nextActor.split('_')[0];
@@ -267,20 +288,26 @@ export function BattlePage(container, params) {
         if (isProcessing) return;
         isProcessing = true;
 
+        // Optimistic UI Update? No, wait for response.
+
+        // Pass Tactics
         try {
-            const nextTurn = battleState.turnNo + 1;
-            const res = await battleAPI.processTurn(userId, castSkill, nextTurn);
+            const res = await battleAPI.processTurn(
+                userId,
+                castSkill,
+                battleState.turnNo + 1,
+                currentTactics
+            );
 
             if (res.code === 200) {
                 const newState = res.data;
                 if (newState.lastEvents) addLogs(newState.lastEvents);
-
                 battleState = newState;
                 renderBattle(newState);
-
                 isProcessing = false;
                 checkTurn();
             } else {
+                // idempotent retry or error?
                 console.error(res.message);
                 isProcessing = false;
             }

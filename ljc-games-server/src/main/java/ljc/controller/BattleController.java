@@ -53,7 +53,7 @@ public class BattleController {
     @PostMapping("/turn")
     public Result<BattleContext> processTurn(@RequestParam Long userId, @RequestBody TurnReq req) {
         try {
-            BattleContext ctx = battleService.processTurn(userId, req.getCastSkill(), req.getClientTurnNo());
+            BattleContext ctx = battleService.processTurn(userId, req.getCastSkill(), req.getClientTurnNo(), req.getTactics());
             return Result.success(ctx);
         } catch (RuntimeException e) {
             return Result.error(e.getMessage());
@@ -64,6 +64,7 @@ public class BattleController {
     public static class TurnReq {
         private Boolean castSkill;
         private Integer clientTurnNo; // 幂等：前端传 currentTurn + 1
+        private String tactics;       // 战术指令
     }
 
     @Data

@@ -169,8 +169,8 @@ export const battleAPI = {
     },
 
     // POST /battle/turn?userId=xxx  Body: {castSkill}
-    processTurn(userId, castSkill, clientTurnNo) {
-        return API.postWithParams('/battle/turn', { userId }, { castSkill, clientTurnNo });
+    processTurn: (userId, castSkill, clientTurnNo, tactics) => {
+        return API.postWithParams('/battle/turn', { userId }, { castSkill, clientTurnNo, tactics });
     },
 
     // GET /battle/state?userId=xxx
