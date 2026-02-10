@@ -247,8 +247,7 @@ export function StageSelectionPage(container) {
   }
 
   function enterBattlePrepare(civ, stage) {
-    if (confirm(`准备攻打 [${civ} 第${stage}关] 吗？`)) {
-      router.navigate('/battle', { civ, stageNo: stage });
-    }
+    // 跳转到战前配兵页
+    router.navigate('/battle/prepare', { civ, stageNo: stage });
   }
 }

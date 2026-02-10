@@ -8,6 +8,7 @@ import { EquipmentPage } from './pages/EquipmentPage.js';
 import { GemPage } from './pages/GemPage.js';
 import { SkillPage } from './pages/SkillPage.js';
 import { BattlePage } from './pages/BattlePage.js';
+import { BattlePreparePage } from './pages/BattlePreparePage.js';
 
 // 注册路由
 router.register('/login', LoginPage);
@@ -19,6 +20,7 @@ router.register('/equipment', EquipmentPage);
 router.register('/gem', GemPage);
 router.register('/skill', SkillPage);
 router.register('/battle', BattlePage);
+router.register('/battle/prepare', BattlePreparePage);
 
 // 初始化应用
 function init() {
