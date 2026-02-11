@@ -1,5 +1,6 @@
 import { hallAPI, playerAPI, battleAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
+import { getTroopMeta } from '../config/gameData.js';
 
 export function BattlePreparePage(container, params) {
     const userId = localStorage.getItem('userId');
@@ -96,7 +97,14 @@ export function BattlePreparePage(container, params) {
                 renderGenerals();
             }
             if (pRes.code === 200 && pRes.data.troops) {
-                userTroops = pRes.data.troops || [];
+                const civBaseMap = { CN: 2000, JP: 2100, KR: 2200, GB: 2300 };
+                const base = civBaseMap[civ] || 2000;
+                const eliteByCiv = { CN: 3001, JP: 3002, KR: 3003, GB: 3004 };
+                const allow = new Set([base + 1, base + 2, base + 3, eliteByCiv[civ]]);
+
+                userTroops = (pRes.data.troops || [])
+                    .filter(t => allow.has(t.troopId) && (t.count || 0) > 0)
+                    .sort((a, b) => (a.troopId || 0) - (b.troopId || 0));
             }
         } catch (e) { console.error(e); }
     }
@@ -142,17 +150,6 @@ export function BattlePreparePage(container, params) {
         updateCapacity();
     }
 
-    // Local definitions
-    const TROOP_DEFS = {
-        2001: { name: '步兵(INF)' },
-        2002: { name: '弓兵(ARC)' },
-        2003: { name: '骑兵(CAV)' },
-        3001: { name: '诸葛连弩(CN)' },
-        3002: { name: '鬼武者(JP)' },
-        3003: { name: '花郎箭手(KR)' },
-        3004: { name: '皇家骑士(GB)' },
-    };
-
     function renderTroops() {
         if (!selectedGeneralId) return;
         const list = document.getElementById('troops-list');
@@ -163,14 +160,14 @@ export function BattlePreparePage(container, params) {
         }
 
         list.innerHTML = userTroops.map(t => {
-            const def = TROOP_DEFS[t.troopId] || { name: `未知兵种` };
+            const def = getTroopMeta(t.troopId);
             const currentVal = troopConfig[t.troopId] || 0;
             // Use t.count instead of t.totalCount (backend field name mismatch)
             const total = t.count || 0;
 
             return `
             <div class="troop-row">
-               <div class="t-name">${def.name} (余:${total})</div>
+               <div class="t-name">${def.icon} ${def.name}${def.isElite ? ' [特种]' : ''} (余:${total})</div>
                <div class="t-control">
                   <button class="btn-tiny btn-minus" data-id="${t.troopId}">-10</button>
                   <input type="number" class="troop-input" id="input-${t.troopId}" value="${currentVal}" max="${total}" min="0">
@@ -229,18 +226,22 @@ export function BattlePreparePage(container, params) {
         if (!gen) return;
 
         const totalSoldiers = Object.values(troopConfig).reduce((a, b) => a + b, 0);
-        // Rule: Total soldiers <= capacity
+        const usedCapacity = Object.entries(troopConfig).reduce((sum, [tid, cnt]) => {
+            const meta = getTroopMeta(parseInt(tid, 10));
+            return sum + (cnt || 0) * (meta.capCost || 1);
+        }, 0);
+        // Rule: occupied capacity <= capacity
         const maxSoldiers = gen.capacity || 0;
 
         const capEl = document.getElementById('capacity-display');
-        capEl.textContent = `(兵力/统率: ${totalSoldiers}/${maxSoldiers})`;
+        capEl.textContent = `(统率占用: ${usedCapacity}/${maxSoldiers}，总兵数: ${totalSoldiers})`;
 
         const btn = document.getElementById('start-btn');
-        const isValid = totalSoldiers > 0 && totalSoldiers <= maxSoldiers;
+        const isValid = totalSoldiers > 0 && usedCapacity <= maxSoldiers;
 
         btn.disabled = !isValid;
 
-        if (totalSoldiers > maxSoldiers) {
+        if (usedCapacity > maxSoldiers) {
             capEl.style.color = 'var(--danger-color)';
             btn.textContent = "兵力超过统率上限";
         } else if (totalSoldiers === 0) {

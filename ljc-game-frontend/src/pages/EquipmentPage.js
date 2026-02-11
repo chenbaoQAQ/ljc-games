@@ -1,5 +1,6 @@
 import { hallAPI, playerAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
+import { getEquipmentSlotIcon, getEquipmentSlotLabel } from '../config/gameData.js';
 
 export function EquipmentPage(container) {
   const userId = localStorage.getItem('userId');
@@ -21,8 +22,7 @@ export function EquipmentPage(container) {
     </div>
   `;
 
-  const style = '...' + // 复用之前的样式
-    `
+  const style = `
     .equipment-page {
       min-height: 100vh;
       background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-medium) 100%);
@@ -74,6 +74,8 @@ export function EquipmentPage(container) {
   `;
 
   const styleEl = document.createElement('style');
+  styleEl.id = 'equipment-page-style';
+  document.getElementById('equipment-page-style')?.remove();
   styleEl.textContent = style;
   document.head.appendChild(styleEl);
 
@@ -95,9 +97,9 @@ export function EquipmentPage(container) {
         list.innerHTML = equipRes.data.map(e => {
           const lv = e.enhanceLevel || 0;
           const cost = (lv + 1) * 100;
-          // 简单的名字判断
-          const name = (e.templateId === 1) ? '铁剑' : (e.templateId === 2) ? '皮甲' : `装备#${e.templateId}`;
-          const icon = (e.templateId === 1) ? '⚔️' : '🛡️';
+          const name = e.name || `装备#${e.templateId}`;
+          const icon = getEquipmentSlotIcon(e.slot);
+          const slotName = getEquipmentSlotLabel(e.slot);
 
           return `
            <div class="equip-card">
@@ -105,9 +107,10 @@ export function EquipmentPage(container) {
                <div class="ec-icon">${icon}</div>
                <div class="ec-info">
                  <div class="ec-name">${name} <span class="ec-lv">+${lv}</span></div>
-                 <div class="ec-stat">${e.generalId ? '已穿戴' : '闲置'}</div>
+                 <div class="ec-stat">${slotName} · ${e.generalId ? '已穿戴' : '闲置'}</div>
                </div>
              </div>
+             <div class="ec-stat">基础属性: ATK ${e.baseAtk || 0} / HP ${e.baseHp || 0} / SPD ${e.baseSpd || 0}</div>
              <div class="ec-stat">消耗: ${cost}金币</div>
              <button class="btn btn-primary enhance-btn" data-id="${e.id}" data-cost="${cost}">强化</button>
            </div>

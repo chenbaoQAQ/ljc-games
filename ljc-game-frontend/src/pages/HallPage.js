@@ -1,6 +1,6 @@
 import { playerAPI, hallAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
-import { CIV_BASE_TROOP } from '../config/gameData.js';
+import { getTroopMeta } from '../config/gameData.js';
 
 export function HallPage(container) {
   const userId = localStorage.getItem('userId');
@@ -47,27 +47,7 @@ export function HallPage(container) {
         <div class="section-card card">
           <h2 class="card-title">⚔️ 兵力</h2>
           <div class="troops-grid" id="troops-grid">
-            <div class="troop-item">
-              <div class="troop-icon" style="background: var(--inf-color);">🛡️</div>
-              <div class="troop-info">
-                <span class="troop-name">步兵</span>
-                <span class="troop-count" id="inf-count">0</span>
-              </div>
-            </div>
-            <div class="troop-item">
-              <div class="troop-icon" style="background: var(--arc-color);">🏹</div>
-              <div class="troop-info">
-                <span class="troop-name">弓兵</span>
-                <span class="troop-count" id="arc-count">0</span>
-              </div>
-            </div>
-            <div class="troop-item">
-              <div class="troop-icon" style="background: var(--cav-color);">🐎</div>
-              <div class="troop-info">
-                <span class="troop-name">骑兵</span>
-                <span class="troop-count" id="cav-count">0</span>
-              </div>
-            </div>
+            <div class="spinner"></div>
           </div>
           <button class="btn btn-primary" id="recruit-btn">招募士兵</button>
         </div>
@@ -227,9 +207,12 @@ export function HallPage(container) {
 
     .troops-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: var(--spacing-md);
       margin-bottom: var(--spacing-md);
+      max-height: 300px;
+      overflow-y: auto;
+      padding-right: 4px;
     }
 
     .troop-item {
@@ -261,11 +244,15 @@ export function HallPage(container) {
     .troop-info {
       display: flex;
       flex-direction: column;
+      min-width: 0;
     }
 
     .troop-name {
       font-size: 0.9rem;
       color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .troop-count {
@@ -339,24 +326,7 @@ export function HallPage(container) {
         document.getElementById('gold-count').textContent = (result.data.gold || 0).toLocaleString();
         document.getElementById('diamond-count').textContent = (result.data.diamond || 0).toLocaleString();
 
-        // 更新兵力显示：仅显示当前国家的三基础兵种，不做全国家汇总
-        if (result.data.troops) {
-          const civ = result.data.initialCiv || 'CN';
-          const base = CIV_BASE_TROOP[civ] || 2000;
-
-          const troopMap = {};
-          result.data.troops.forEach(troop => {
-            troopMap[troop.troopId] = troop.count || 0;
-          });
-
-          const inf = troopMap[base + 1] || 0;
-          const arc = troopMap[base + 2] || 0;
-          const cav = troopMap[base + 3] || 0;
-
-          document.getElementById('inf-count').textContent = inf.toLocaleString();
-          document.getElementById('arc-count').textContent = arc.toLocaleString();
-          document.getElementById('cav-count').textContent = cav.toLocaleString();
-        }
+        renderTroops(result.data.troops || [], result.data.initialCiv || 'CN');
       } else {
         console.warn('加载玩家数据: code不为200', result);
       }
@@ -415,6 +385,47 @@ export function HallPage(container) {
     } catch (error) {
       console.error('加载进度失败:', error);
     }
+  }
+
+  function renderTroops(troops, civ) {
+    const grid = document.getElementById('troops-grid');
+    if (!grid) return;
+
+    const list = (troops || [])
+      .map(t => {
+        const meta = getTroopMeta(t.troopId);
+        return {
+          troopId: t.troopId,
+          count: t.count || 0,
+          civ: meta.civ,
+          type: meta.type,
+          icon: meta.icon,
+          name: meta.name,
+          color: meta.color,
+          isElite: !!meta.isElite,
+        };
+      })
+      .filter(t => t.civ === civ)
+      .sort((a, b) => {
+        if (a.isElite !== b.isElite) return a.isElite ? 1 : -1;
+        const typeOrder = { INF: 1, ARC: 2, CAV: 3 };
+        return (typeOrder[a.type] || 9) - (typeOrder[b.type] || 9);
+      });
+
+    if (list.length === 0) {
+      grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">暂无兵力</p>';
+      return;
+    }
+
+    grid.innerHTML = list.map(troop => `
+      <div class="troop-item">
+        <div class="troop-icon" style="background: ${troop.color};">${troop.icon}</div>
+        <div class="troop-info">
+          <span class="troop-name">${troop.name}${troop.isElite ? ' [特种]' : ''}</span>
+          <span class="troop-count">${troop.count.toLocaleString()}</span>
+        </div>
+      </div>
+    `).join('');
   }
 
   // 事件绑定

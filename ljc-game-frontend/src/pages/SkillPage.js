@@ -1,6 +1,7 @@
 
 import { hallAPI, playerAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
+import { SKILL_BOOK_META } from '../config/gameData.js';
 
 export function SkillPage(container) {
     const userId = localStorage.getItem('userId');
@@ -133,7 +134,7 @@ export function SkillPage(container) {
         <div class="book-card" data-iid="${b.itemId}">
           <div class="book-icon">📚</div>
           <div>
-            <div style="font-weight:bold">技能书 #${b.itemId}</div>
+            <div style="font-weight:bold">${SKILL_BOOK_META[b.itemId]?.name || ('技能书 #' + b.itemId)}</div>
             <div style="font-size:0.8rem;color:#888">拥有: ${b.count}</div>
           </div>
           <button class="btn btn-primary btn-sm learn-btn" data-iid="${b.itemId}">学习</button>

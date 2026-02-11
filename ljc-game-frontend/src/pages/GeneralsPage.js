@@ -47,6 +47,8 @@ export function GeneralsPage(container) {
   `;
 
   const style = document.createElement('style');
+  style.id = 'generals-page-style';
+  document.getElementById('generals-page-style')?.remove();
   style.textContent = `
     .generals-page { min-height: 100vh; background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-medium) 100%); }
     .page-nav { background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); padding: 15px 20px; display: flex; align-items: center; gap: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); position: sticky; top: 0; z-index: 100; }
@@ -195,7 +197,7 @@ export function GeneralsPage(container) {
     const list = document.getElementById('equip-list');
 
     // Filter for slot match
-    const available = allEquipments.filter(e => e.slot === sKey);
+    const available = allEquipments.filter(e => e.slot === sKey && (!e.generalId || e.generalId === currentGeneralId));
 
     const content = available.length ? available.map(e => `
         <div class="equip-item" data-id="${e.id}">

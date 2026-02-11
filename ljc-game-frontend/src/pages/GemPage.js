@@ -53,6 +53,8 @@ export function GemPage(container) {
   // Styles...
   // 复用之前的样式，增加 modal 样式
   const style = document.createElement('style');
+  style.id = 'gem-page-style';
+  document.getElementById('gem-page-style')?.remove();
   style.textContent = `
     .gem-page { min-height: 100vh; background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-medium) 100%); }
     .page-nav { background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); padding: 15px 20px; display: flex; align-items: center; gap: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); position: sticky; top: 0; z-index: 100; }
@@ -145,7 +147,7 @@ export function GemPage(container) {
       if (equipRes.code === 200 && equipRes.data) {
         equipList.innerHTML = equipRes.data.map(e => `
           <div class="equip-item" data-id="${e.id}">
-             <div style="font-weight:bold">${e.templateId === 1 ? '铁剑' : e.templateId === 2 ? '皮甲' : '装备'} +${e.enhanceLevel || 0}</div>
+             <div style="font-weight:bold">${e.name || ('装备#' + e.templateId)} +${e.enhanceLevel || 0}</div>
              <div style="font-size:0.8rem;color:#888; margin-top:5px;">
                <span class="socket-span" data-eid="${e.id}" data-idx="1" style="background:${e.socket1GemId ? 'rgba(46,204,113,0.2)' : 'rgba(255,255,255,0.1)'};padding:2px 6px;border-radius:4px;cursor:pointer;">
                  孔1: ${e.socket1GemId ? '已镶嵌' : '+ 空'}

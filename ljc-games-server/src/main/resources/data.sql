@@ -267,22 +267,22 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
     -- CN：治疗向、坦中速
-    (1001, 'CN', '刘备', 62, 980, 7, 62, 'STOIC', 0, 20, 1),
-    (1002, 'CN', '关羽', 88, 1160, 7, 72, 'BERSERKER', 1200, 20, 2),
-    (1003, 'CN', '张飞', 96, 1320, 8, 58, 'BERSERKER', 1800, 20, 4),
-    (1004, 'CN', '赵云', 92, 1080, 8, 82, 'STOIC', 2400, 20, 6),
+    (1001, 'CN', '刘备', 62, 980, 12, 62, 'STOIC', 0, 20, 1),
+    (1002, 'CN', '关羽', 88, 1160, 13, 72, 'BERSERKER', 1200, 20, 2),
+    (1003, 'CN', '张飞', 96, 1320, 14, 58, 'BERSERKER', 1800, 20, 4),
+    (1004, 'CN', '赵云', 92, 1080, 13, 82, 'STOIC', 2400, 20, 6),
     -- JP：AOE与爆发倾向
-    (2001, 'JP', '织田信长', 84, 1020, 7, 76, 'BERSERKER', 0, 20, 2),
-    (2002, 'JP', '真田幸村', 90, 1100, 7, 80, 'BERSERKER', 1200, 20, 3),
-    (2003, 'JP', '德川家康', 74, 1240, 8, 66, 'STOIC', 2200, 20, 5),
+    (2001, 'JP', '织田信长', 84, 1020, 12, 76, 'BERSERKER', 0, 20, 2),
+    (2002, 'JP', '真田幸村', 90, 1100, 13, 80, 'BERSERKER', 1200, 20, 3),
+    (2003, 'JP', '德川家康', 74, 1240, 14, 66, 'STOIC', 2200, 20, 5),
     -- KR：偏Buff与控场
-    (2201, 'KR', '李舜臣', 78, 1120, 8, 70, 'STOIC', 0, 20, 5),
-    (2202, 'KR', '金庾信', 82, 1060, 8, 74, 'STOIC', 1200, 20, 1),
-    (2203, 'KR', '乙支文德', 94, 1180, 8, 78, 'BERSERKER', 2200, 20, 4),
+    (2201, 'KR', '李舜臣', 78, 1120, 12, 70, 'STOIC', 0, 20, 5),
+    (2202, 'KR', '金庾信', 82, 1060, 13, 74, 'STOIC', 1200, 20, 1),
+    (2203, 'KR', '乙支文德', 94, 1180, 14, 78, 'BERSERKER', 2200, 20, 4),
     -- GB：偏减益与压制
-    (2301, 'GB', '亚瑟', 80, 1140, 8, 68, 'STOIC', 0, 20, 5),
-    (2302, 'GB', '兰斯洛特', 92, 1080, 7, 84, 'BERSERKER', 1400, 20, 3),
-    (2303, 'GB', '莫德雷德', 98, 1200, 8, 79, 'BERSERKER', 2400, 20, 4)
+    (2301, 'GB', '亚瑟', 80, 1140, 12, 68, 'STOIC', 0, 20, 5),
+    (2302, 'GB', '兰斯洛特', 92, 1080, 13, 84, 'BERSERKER', 1400, 20, 3),
+    (2303, 'GB', '莫德雷德', 98, 1200, 14, 79, 'BERSERKER', 2400, 20, 4)
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     base_atk = VALUES(base_atk),
@@ -297,10 +297,10 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, base_atk, base_hp, recruit_gold_cost, unlock_civ_required) VALUES
     -- 特种兵定位：
     -- 3001 治疗、3002 AOE分流、3003 英雄Buff、3004 敌军减攻（当前版本先体现在定位与数值）
-    (3001, 'CN', '青囊医官', 'ARC', 1, 2, 30, 82, 120, 1),
-    (3002, 'JP', '爆裂火筒队', 'ARC', 1, 2, 44, 68, 130, 1),
-    (3003, 'KR', '军乐旗卫', 'INF', 1, 2, 36, 108, 130, 1),
-    (3004, 'GB', '破甲工兵', 'INF', 1, 2, 38, 116, 140, 1)
+    (3001, 'CN', '青囊医官', 'ARC', 1, 3, 30, 82, 120, 1),
+    (3002, 'JP', '爆裂火筒队', 'ARC', 1, 3, 44, 68, 130, 1),
+    (3003, 'KR', '军乐旗卫', 'INF', 1, 3, 36, 108, 130, 1),
+    (3004, 'GB', '破甲工兵', 'INF', 1, 3, 38, 116, 140, 1)
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     troop_type = VALUES(troop_type),
@@ -312,12 +312,49 @@ ON DUPLICATE KEY UPDATE
     unlock_civ_required = VALUES(unlock_civ_required);
 
 INSERT INTO user_troops (user_id, troop_id, count) VALUES
+    -- 只给当前国家(CN)可用兵力，其他国家初始为0，避免前端/玩法混乱
+    (1, 2001, 600),
+    (1, 2002, 500),
+    (1, 2003, 300),
     (1, 3001, 120),
-    (1, 3002, 120),
-    (1, 3003, 120),
-    (1, 3004, 120)
+    (1, 2101, 0), (1, 2102, 0), (1, 2103, 0), (1, 3002, 0),
+    (1, 2201, 0), (1, 2202, 0), (1, 2203, 0), (1, 3003, 0),
+    (1, 2301, 0), (1, 2302, 0), (1, 2303, 0), (1, 3004, 0)
 ON DUPLICATE KEY UPDATE
     count = VALUES(count);
+
+-- 同步我方初始武将实例数值（与模板对齐，便于直接测试）
+UPDATE user_generals
+SET level = 1, tier = 0, current_hp = 980, max_hp = 980, capacity = 12, unlocked = 1, activated = 1
+WHERE user_id = 1 AND template_id = 1001;
+
+UPDATE user_generals
+SET level = 1, tier = 0, current_hp = 1160, max_hp = 1160, capacity = 13, unlocked = 1, activated = 0
+WHERE user_id = 1 AND template_id = 1002;
+
+-- 统一兵种统率占用（与前端 capCost 保持一致）
+UPDATE troop_template SET cost = 2 WHERE is_elite = 0 AND troop_type IN ('INF', 'ARC');
+UPDATE troop_template SET cost = 3 WHERE is_elite = 0 AND troop_type = 'CAV';
+UPDATE troop_template SET cost = 3 WHERE is_elite = 1;
+
+-- 关卡重填（CN 1-10）：前期更平滑，后期逐步抬压
+INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, enemy_multiplier, drop_pool_id, enemy_config_json) VALUES
+('CN', 1, 'NORMAL', 0, 1000, 1, '{"hero":{"name":"山贼哨长","maxHp":760,"currentHp":760,"atk":44,"speed":36,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":8,"unitHp":20,"frontHp":20}]}'),
+('CN', 2, 'NORMAL', 0, 1050, 1, '{"hero":{"name":"黄巾什长","maxHp":900,"currentHp":900,"atk":50,"speed":40,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":10,"unitHp":20,"frontHp":20},{"troopId":2002,"type":"ARC","count":6,"unitHp":16,"frontHp":16}]}'),
+('CN', 3, 'NORMAL', 0, 1120, 1, '{"hero":{"name":"黄巾校尉","maxHp":1080,"currentHp":1080,"atk":58,"speed":44,"personality":"BERSERKER"},"troops":[{"troopId":2001,"type":"INF","count":14,"unitHp":20,"frontHp":20},{"troopId":2002,"type":"ARC","count":8,"unitHp":16,"frontHp":16}]}'),
+('CN', 4, 'NORMAL', 0, 1200, 1, '{"hero":{"name":"黄巾军师","maxHp":1260,"currentHp":1260,"atk":66,"speed":52,"personality":"STOIC"},"troops":[{"troopId":2002,"type":"ARC","count":12,"unitHp":18,"frontHp":18},{"troopId":2003,"type":"CAV","count":6,"unitHp":28,"frontHp":28}]}'),
+('CN', 5, 'WALL', 25, 1300, 2, '{"hero":{"name":"城门守将","maxHp":1650,"currentHp":1650,"atk":72,"speed":38,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":18,"unitHp":22,"frontHp":22},{"troopId":2002,"type":"ARC","count":16,"unitHp":18,"frontHp":18}]}'),
+('CN', 6, 'NORMAL', 0, 1400, 2, '{"hero":{"name":"西凉前锋","maxHp":1880,"currentHp":1880,"atk":82,"speed":62,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":12,"unitHp":32,"frontHp":32},{"troopId":2002,"type":"ARC","count":14,"unitHp":18,"frontHp":18}]}'),
+('CN', 7, 'NORMAL', 0, 1520, 2, '{"hero":{"name":"西凉铁骑统领","maxHp":2200,"currentHp":2200,"atk":92,"speed":70,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":18,"unitHp":34,"frontHp":34},{"troopId":2001,"type":"INF","count":20,"unitHp":24,"frontHp":24}]}'),
+('CN', 8, 'NORMAL', 0, 1650, 3, '{"hero":{"name":"虎牢关守卫","maxHp":2550,"currentHp":2550,"atk":104,"speed":58,"personality":"STOIC"},"troops":[{"troopId":2001,"type":"INF","count":28,"unitHp":26,"frontHp":26},{"troopId":2002,"type":"ARC","count":22,"unitHp":20,"frontHp":20},{"troopId":2003,"type":"CAV","count":10,"unitHp":36,"frontHp":36}]}'),
+('CN', 9, 'WALL', 60, 1820, 3, '{"hero":{"name":"华雄","maxHp":3200,"currentHp":3200,"atk":128,"speed":76,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":30,"unitHp":40,"frontHp":40},{"troopId":2002,"type":"ARC","count":24,"unitHp":22,"frontHp":22}]}'),
+('CN', 10, 'BOSS', 0, 2050, 5, '{"hero":{"name":"吕布","maxHp":4300,"currentHp":4300,"atk":165,"speed":92,"personality":"BERSERKER"},"troops":[{"troopId":2003,"type":"CAV","count":36,"unitHp":44,"frontHp":44},{"troopId":2002,"type":"ARC","count":30,"unitHp":24,"frontHp":24},{"troopId":2001,"type":"INF","count":24,"unitHp":28,"frontHp":28}]}')
+ON DUPLICATE KEY UPDATE
+    stage_type = VALUES(stage_type),
+    wall_cost_troops = VALUES(wall_cost_troops),
+    enemy_multiplier = VALUES(enemy_multiplier),
+    drop_pool_id = VALUES(drop_pool_id),
+    enemy_config_json = VALUES(enemy_config_json);
 
 -- 重新启用外键检查
 SET FOREIGN_KEY_CHECKS = 1;
