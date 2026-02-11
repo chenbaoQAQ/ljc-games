@@ -41,6 +41,7 @@ public class PlayerInfoService {
         // === 任务 A: 搬运基础信息 ===
         resp.setId(user.getId());
         resp.setNickname(user.getNickname());
+        resp.setInitialCiv(user.getInitialCiv());
         resp.setGold(user.getGold());
         resp.setDiamond(user.getDiamond());
 

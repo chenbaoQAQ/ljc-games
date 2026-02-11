@@ -20,4 +20,5 @@ public class UserEquipmentVO {
     // Optional: Stats for display?
     private Long baseAtk;
     private Long baseHp;
+    private Long baseSpd;
 }

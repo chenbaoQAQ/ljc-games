@@ -160,6 +160,7 @@ export function GeneralsPage(container) {
             <div class="stats-row">
                <div class="stat-item"><span class="stat-val">${g.currentHp}/${g.maxHp}</span><span class="stat-lbl">HP</span></div>
                <div class="stat-item"><span class="stat-val">${g.atk || 0}</span><span class="stat-lbl">攻击</span></div>
+               <div class="stat-item"><span class="stat-val">${g.speed || 0}</span><span class="stat-lbl">速度</span></div>
                <div class="stat-item"><span class="stat-val">${g.capacity || 0}</span><span class="stat-lbl">统率</span></div>
             </div>
 

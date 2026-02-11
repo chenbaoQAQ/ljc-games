@@ -2,26 +2,24 @@ package ljc.battle.core;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 import ljc.battle.core.BattleState.Hero;
 import ljc.battle.core.BattleState.Side;
-import ljc.battle.core.BattleState.TroopStack;
 import ljc.battle.core.BattleLogEvent.Type;
+import ljc.battle.core.BattleLogEvent.Phase; // If using explicit Phase enum
 import ljc.battle.core.TroopDamage;
 import ljc.battle.core.StatusLogic;
+import ljc.battle.core.TroopStack;
 
 /**
- * BattleEngine V2.8
+ * BattleEngine V3.0 (Final)
  * 
- * Update V2.8:
- * - Strict Stack Model (Count/UnitHp/FrontHp)
- * - Strict Priority Targeting
- * - Damage Overflow
- * - ARC Phase First
- * - Hero Skill Delay (Perform Normal Attack this turn, Skill next turn)
+ * Features:
+ * - Phase 1: HERO_SOLO (Turn 1-3)
+ * - Phase 2: TROOP_WAR (Turn 4+)
+ * - Troop Damage Split (Roll 0-100 to Hero/Troop)
+ * - Event Driven (Strict V3 Event Schema)
  */
 public class BattleEngine {
     
@@ -33,6 +31,7 @@ public class BattleEngine {
 
     public TurnResult processTurn(BattleState state, TurnCommand command) {
         TurnResult result = new TurnResult();
+        normalizeSideTempEffects(state);
         
         // 1. Idempotency Check
         if (command.clientTurnNo != state.turnNo + 1) {
@@ -44,34 +43,43 @@ public class BattleEngine {
              }
         }
 
-        // 2. Pre-Process: Update Tactics & Phase Start
+        // 2. Define Phase & Init
+        if (state.phase == null || state.phase.isEmpty()) {
+            state.phase = "HERO_SOLO";
+        }
+        if (state.turnNo == 0) {
+            result.logEvents.add(new BattleLogEvent(Type.TURN_START, "SYSTEM", "BATTLE", 1, "Battle Start"));
+        }
+        
+        // 3. Pre-Process (Start of Round)
         if (state.currentActorIndex == 0) {
-            // Update Tactics from Command (User input applies to this whole round)
             if (command.tactics != null && !command.tactics.isEmpty()) {
                 state.sideA.hero.tactics = command.tactics;
             }
             
-            // Log Round Start
-            if (state.turnNo == 0) {
-                 result.logEvents.add(new BattleLogEvent(Type.TURN_START, "SYSTEM", "BATTLE", 1, "Battle Start"));
-            }
+            // Turn Start Event
+            BattleLogEvent startEvt = new BattleLogEvent();
+            startEvt.type = Type.TURN_START;
+            startEvt.turn = state.turnNo + 1;
+            // startEvt.phase = Phase.valueOf(state.phase); // If strictly typed
+            result.logEvents.add(startEvt);
             
-            // DoT / HoT
             StatusLogic.processPhaseStart(state, null, result.logEvents);
         }
 
-        // 3. Determine Queue
+        // 4. Determine Queue
         List<Actor> actionQueue = determineActionQueue(state);
         
-        // Check Round End
+        // Round End Check
         if (state.currentActorIndex >= actionQueue.size()) {
             state.currentActorIndex = 0;
-            result.logEvents.add(new BattleLogEvent(Type.TURN_END, "SYSTEM", "ROUND", state.turnNo, "Round Finished"));
             StatusLogic.decreaseDurations(state);
-            actionQueue = determineActionQueue(state); // Re-calc for next round
+            decayTemporarySideEffects(state);
+            maybeSwitchToTroopWar(state, result);
+            actionQueue = determineActionQueue(state); 
         }
         
-        if (actionQueue.isEmpty()) { // All dead?
+        if (actionQueue.isEmpty()) { 
              state.isFinished = true;
              result.finished = true;
              return result;
@@ -79,24 +87,31 @@ public class BattleEngine {
         
         Actor currentActor = actionQueue.get(state.currentActorIndex);
         
-        // 4. Execute
+        // 5. Execute Action
         executeAction(state, currentActor, command, result);
         
-        // 5. Update State
+        // 6. Update State
         state.turnNo++; 
         state.currentActorIndex++;
         
-        // 6. Check Win/Loss
+        // Keep actor index aligned at round boundary so service can stop at "one round".
+        if (state.currentActorIndex >= actionQueue.size()) {
+            state.currentActorIndex = 0;
+            StatusLogic.decreaseDurations(state);
+            decayTemporarySideEffects(state);
+            maybeSwitchToTroopWar(state, result);
+        }
+        
+        // 7. Check Win/Loss
         checkBattleEnd(state, result);
         
-        // 7. Predict Next
+        // 8. Predict Next
         if (!state.isFinished) {
              List<Actor> nextQueue = (state.currentActorIndex == 0) ? determineActionQueue(state) : actionQueue;
              if (!nextQueue.isEmpty()) {
                  int idx = state.currentActorIndex;
                  if (idx >= nextQueue.size()) idx = 0;
-                 Actor next = nextQueue.get(idx);
-                 result.nextActorDesc = getActorDesc(state, next);
+                 result.nextActorDesc = getActorDesc(state, nextQueue.get(idx));
                  state.nextActorDesc = result.nextActorDesc;
              } else {
                  state.nextActorDesc = null;
@@ -124,209 +139,383 @@ public class BattleEngine {
              : (actor.troop.type + (actor.side == state.sideA ? "_A" : "_B"));
     }
 
-    // --- Core Execution ---
+    // --- Execution Dispatcher ---
 
     private void executeAction(BattleState state, Actor actor, TurnCommand cmd, TurnResult result) {
-        String actorId = getActorDesc(state, actor);
-        result.logEvents.add(new BattleLogEvent(Type.ACTOR_CHOSEN, actorId, null, 0, "Acting"));
-        
-        if (isActorStunned(state, actor)) {
-             result.logEvents.add(new BattleLogEvent(Type.STUN_SKIP, actorId, "Self", 0, "Stunned"));
-             consumeStun(state, actor);
-             return; 
-        }
+        if (isActorStunned(state, actor)) return;
 
         if (actor.isHero) {
-            Hero hero = actor.side.hero;
-            if (!hero.isAlive()) return;
-
-            // 1. Check Delayed Skill (V2.8 NextTurn Logic)
-            if (hero.nextTurnSkillId != null) {
-                // Execute Pre-set Skill
-                SkillResolver.SkillDecision decision = new SkillResolver.SkillDecision(SkillResolver.SkillDecision.Type.SKILL_A, hero.nextTurnSkillId, actor.side);
-                SkillResolver.SkillEffect effect = skillResolver.resolve(state, decision);
-                
-                for (String log : effect.logs) {
-                    result.logEvents.add(new BattleLogEvent(Type.SKILL, actorId, "Skill", 0, log));
-                }
-                
-                hero.nextTurnSkillId = null; // Clear
-                return; // Skill executed, Action done.
-            }
-
-            // 2. Prepare for Next Turn Skill?
-            boolean userPrep = (actor.side == state.sideA && cmd.type == TurnCommand.ActionType.SKILL && hero.skillCd <= 0);
-            boolean aiPrep = (actor.side == state.sideB && skillResolver.decideSkill(state, actor.side).type == SkillResolver.SkillDecision.Type.SKILL_A);
-
-            if (userPrep || aiPrep) {
-                // Set flag for NEXT turn
-                hero.nextTurnSkillId = "SKILL_DEFAULT"; // or actual ID
-                hero.skillCd = hero.maxSkillCd;
-                result.logEvents.add(new BattleLogEvent(Type.SKILL_CAST, actorId, null, 0, "技能蓄力! 下回合释放!"));
-                // And fall through to perform NORMAL ATTACK this turn
-            }
-
-            // 3. Normal Attack (Always performed if not executing a delayed skill)
-            performHeroAttack(state, actor.side, getEnemySide(state, actor.side), result);
-
+            performHeroAction(state, actor, cmd, result);
         } else {
-            // Troop Action
-            TroopStack stack = actor.troop;
-            if (stack.count <= 0) return; 
-
-            performTroopAttack(state, actor.side, getEnemySide(state, actor.side), stack, result);
+            performTroopAction(state, actor, result);
         }
     }
+    
+    // --- V3 Hero Action ---
 
-    // --- Hero Attack (Strict V2.8) ---
-    private void performHeroAttack(BattleState state, Side attackerSide, Side defenderSide, TurnResult result) {
-        int dmg = attackerSide.hero.atk;
-        String attackerName = attackerSide.hero.name;
+    private void performHeroAction(BattleState state, Actor actor, TurnCommand cmd, TurnResult result) {
+        Hero hero = actor.side.hero;
+        if (!hero.isAlive()) return;
+        
+        String sideStr = (actor.side == state.sideA) ? "my" : "enemy";
 
-        // V2.8 Priority: Hero > Special > ARC > CAV > INF
+        // 1. Skill Execution (Delayed)
+        if (hero.nextTurnSkillId != null) {
+            int heroAtk = applyRate(hero.atk, actor.side.heroAtkRatePermille);
+            int skillDmg = (int)(heroAtk * 1.5); 
+            
+            BattleLogEvent evt = new BattleLogEvent();
+            evt.type = Type.HERO_SKILL;
+            evt.actorSide = sideStr;
+            evt.skillId = hero.nextTurnSkillId;
+            evt.value = skillDmg;
+            result.logEvents.add(evt);
+            
+            performHeroAttackLogic(state, actor.side, getEnemySide(state, actor.side), skillDmg, result);
+            
+            hero.nextTurnSkillId = null;
+            return;
+        }
+        
+        // 2. Skill Prep
+        boolean userPrep = (actor.side == state.sideA && cmd.type == TurnCommand.ActionType.SKILL && hero.skillCd <= 0);
+        // AI Logic omitted
+        
+        if (userPrep) {
+            hero.nextTurnSkillId = "SKILL_DEFAULT";
+            hero.skillCd = hero.maxSkillCd;
+            // No event required by V3 doc for prep
+        }
+        
+        // 3. Normal Attack
+        BattleLogEvent atkEvt = new BattleLogEvent();
+        atkEvt.type = Type.HERO_ATTACK;
+        atkEvt.actorSide = sideStr;
+        int heroAtk = applyRate(hero.atk, actor.side.heroAtkRatePermille);
+        atkEvt.value = heroAtk;
+        result.logEvents.add(atkEvt);
+        
+        performHeroAttackLogic(state, actor.side, getEnemySide(state, actor.side), heroAtk, result);
+    }
+    
+    private void performHeroAttackLogic(BattleState state, Side attackerSide, Side defenderSide, int dmg, TurnResult result) {
+        // Priority: Hero > Special > ARC > CAV > INF
         if (defenderSide.hero.isAlive()) {
-             applyHeroDamage(attackerName, defenderSide.hero, dmg, result, state, defenderSide);
+             applyHeroDamage(state, defenderSide, dmg, result);
         } else {
-             List<TroopStack> targets = getStrictPriorityTargets(defenderSide); // Special->ARC->CAV->INF
-             applyDamageChain(attackerName, targets, dmg, result);
+             List<TroopStack> targets = getStrictPriorityTargets(defenderSide);
+             String actorSideStr = (attackerSide == state.sideA) ? "my" : "enemy";
+             String targetSideStr = (attackerSide == state.sideA) ? "enemy" : "my";
+             applyDamageChain(attackerSide.hero.name, targets, dmg, result, targetSideStr);
         }
     }
+    
+    // --- V3 Troop Action ---
 
-    // --- Troop Attack (Strict V2.8) ---
-    private void performTroopAttack(BattleState state, Side attackerSide, Side defenderSide, TroopStack attackerStack, TurnResult result) {
-        int unitAtk = 10; // TODO: Config
-        int totalDmg = attackerStack.count * unitAtk;
-        String attackerName = attackerStack.type;
-
-        // 1. Target Selection
-        // Explicit Tactics > Counter > Strict Priority
-        TroopStack primaryTarget = null;
-        String tactics = attackerSide.hero.tactics;
+    private void performTroopAction(BattleState state, Actor actor, TurnResult result) {
+        TroopStack stack = actor.troop;
+        if (stack.count <= 0) return;
         
-        // Tactics
-        if (tactics != null && tactics.startsWith("TARGET_")) {
-            String type = tactics.replace("TARGET_", "");
-            primaryTarget = findStack(defenderSide, type);
+        Side attackerSide = actor.side;
+        Side defenderSide = getEnemySide(state, attackerSide);
+        String sideStr = (attackerSide == state.sideA) ? "my" : "enemy";
+        String defSideStr = (attackerSide == state.sideA) ? "enemy" : "my";
+        
+        int totalDmg = applyRate(stack.count * 10, attackerSide.troopAtkRatePermille);
+        String specialNote = applyEliteTroopEffects(state, stack, attackerSide, defenderSide, result);
+        
+        // 1. Roll Split
+        int roll = (int)(Math.random() * 101); // 0-100
+        if (!defenderSide.hero.isAlive()) roll = 0;
+        
+        int dmgToHero = (int)(totalDmg * roll / 100.0);
+        int dmgToTroops = totalDmg - dmgToHero;
+        
+        // 2. Emit TROOP_ATTACK
+        BattleLogEvent attEvt = new BattleLogEvent();
+        attEvt.type = Type.TROOP_ATTACK;
+        attEvt.actorSide = sideStr;
+        attEvt.attackerTroopType = stack.type;
+        attEvt.rollToHero = roll;
+        attEvt.damageTotal = totalDmg;
+        attEvt.damageToHero = dmgToHero;
+        attEvt.damageToTroops = dmgToTroops;
+        attEvt.note = specialNote;
+        result.logEvents.add(attEvt);
+        
+        // 3. Apply Hero Damage
+        if (dmgToHero > 0 && defenderSide.hero.isAlive()) {
+            applyHeroDamage(state, defenderSide, dmgToHero, result);
         }
         
-        // Counter
-        if (primaryTarget == null || primaryTarget.count <= 0) {
-            String counterType = getCounterTargetType(attackerStack.type);
-            primaryTarget = findStack(defenderSide, counterType);
-        }
-        
-        // Fallback Priority
-        if (primaryTarget == null || primaryTarget.count <= 0) {
-            List<TroopStack> defaults = getStrictPriorityTargets(defenderSide);
-            if (!defaults.isEmpty()) primaryTarget = defaults.get(0);
-        }
-        
-        if (primaryTarget == null || primaryTarget.count <= 0) return; // No targets
-
-        // 2. Multiplier (V2.8: 1.25 / 0.75)
-        double mult = computeV28Multiplier(attackerStack.type, primaryTarget.type);
-        int finalDmg = (int)(totalDmg * mult);
-
-        // 3. Apply Damage Chain (Overflow)
-        // Chain starts with Primary, then follows Strict Priority (excluding Primary)
-        List<TroopStack> chain = new ArrayList<>();
-        chain.add(primaryTarget);
-        List<TroopStack> others = getStrictPriorityTargets(defenderSide);
-        for (TroopStack t : others) {
-            if (t != primaryTarget && t.count > 0) chain.add(t);
-        }
-        
-        applyDamageChain(attackerName, chain, finalDmg, result);
-
-        // 4. Hero Assist (Commander Attack)
-        if (attackerSide.hero.isAlive() && !isActorStunned(state, new Actor(attackerSide, true, null))) {
-             int assistDmg = (int)(attackerSide.hero.atk * 0.2);
-             if (assistDmg > 0) {
-                 // Assist hits the SAME primary target (if alive) or follows chain
-                 List<TroopStack> assistChain = new ArrayList<>();
-                 if (primaryTarget.count > 0) assistChain.add(primaryTarget);
-                 assistChain.addAll(others);
-                 if (!assistChain.isEmpty()) {
-                     result.logEvents.add(new BattleLogEvent(Type.ASSIST_ATK, attackerSide.hero.name, "Assist", assistDmg, "统帅追击"));
-                     applyDamageChain(attackerSide.hero.name + "(Assist)", assistChain, assistDmg, result);
-                 }
-             }
+        // 4. Apply Troop Damage
+        if (dmgToTroops > 0) {
+            if (stack.troopId == 3002) {
+                applyAoEDistributedTroopDamage(defenderSide, dmgToTroops, result, defSideStr);
+                return;
+            }
+            TroopStack primaryTarget = null;
+            // Tactics logic (Simplified)
+            String tactics = attackerSide.hero.tactics;
+            if (tactics != null && tactics.startsWith("TARGET_")) {
+                 primaryTarget = findStack(defenderSide, tactics.replace("TARGET_", ""));
+            }
+            // Strict Fallback
+            if (primaryTarget == null || primaryTarget.count <= 0) {
+                 List<TroopStack> defaults = getStrictPriorityTargets(defenderSide);
+                 if (!defaults.isEmpty()) primaryTarget = defaults.get(0);
+            }
+            
+            if (primaryTarget != null) {
+                // Construct Chain (Strict Order starting from Primary if possible, or just strict)
+                // V2.8 logic: Targeted -> Overflow to Strict Order
+                List<TroopStack> chain = new ArrayList<>();
+                chain.add(primaryTarget);
+                List<TroopStack> others = getStrictPriorityTargets(defenderSide);
+                for (TroopStack t : others) {
+                    if (t != primaryTarget && t.count > 0) chain.add(t);
+                }
+                applyDamageChain(stack.type, chain, dmgToTroops, result, defSideStr);
+            }
         }
     }
-
-    // --- Strict Damage Chain Logic ---
-    private void applyDamageChain(String attackerName, List<TroopStack> targets, int totalDamage, TurnResult result) {
+    
+    // --- Helpers ---
+    
+    private void applyDamageChain(String attackerName, List<TroopStack> targets, int totalDamage, TurnResult result, String targetSideStr) {
         int remaining = totalDamage;
         for (TroopStack target : targets) {
             if (target.count <= 0) continue;
             
+            int countBefore = target.count;
+            int frontHpBefore = target.frontHp; // Not logged but for debug
+            
             TroopDamage.DamageOutcome outcome = TroopDamage.applyDamage(target, remaining);
             
-            // Log
             if (outcome.killedCount > 0 || remaining > 0) {
-                int deal = remaining - outcome.overflowDamage;
-                result.logEvents.add(new BattleLogEvent(Type.ATTACK, attackerName, target.type, deal, "Killed: " + outcome.killedCount));
-                if (outcome.killedCount > 0) {
-                    result.logEvents.add(new BattleLogEvent(Type.KILL, attackerName, target.type, outcome.killedCount, "Dead"));
-                }
+                // Emit STACK_CHANGE
+                BattleLogEvent stEvt = new BattleLogEvent();
+                stEvt.type = Type.TROOP_STACK_CHANGE;
+                stEvt.side = targetSideStr;
+                stEvt.troopType = target.type;
+                stEvt.killed = outcome.killedCount;
+                stEvt.countBefore = countBefore;
+                stEvt.countAfter = target.count;
+                // Add frontHp info if needed by frontend
+                result.logEvents.add(stEvt);
             }
             
             remaining = outcome.overflowDamage;
             if (remaining <= 0) break;
         }
     }
-
-    // --- V2.8 Logic Helpers ---
     
-    private List<TroopStack> getStrictPriorityTargets(Side side) {
-        // V2.8: Special -> ARC -> CAV -> INF
-        List<TroopStack> list = new ArrayList<>();
-        // TODO: Special
-        addIfValid(list, findStack(side, "ARC"));
-        addIfValid(list, findStack(side, "CAV"));
-        addIfValid(list, findStack(side, "INF"));
-        return list;
-    }
-    
-    private void addIfValid(List<TroopStack> list, TroopStack s) {
-        if (s != null && s.count > 0) list.add(s);
-    }
-
-    private double computeV28Multiplier(String atk, String def) {
-        // INF > ARC > CAV > INF
-        if (atk.equals("INF")) {
-            if (def.equals("ARC")) return 1.25;
-            if (def.equals("CAV")) return 0.75;
-        } else if (atk.equals("ARC")) {
-            if (def.equals("CAV")) return 1.25;
-            if (def.equals("INF")) return 0.75;
-        } else if (atk.equals("CAV")) {
-            if (def.equals("INF")) return 1.25;
-            if (def.equals("ARC")) return 0.75;
+    private void applyHeroDamage(BattleState state, Side defenderSide, int dmg, TurnResult result) {
+        defenderSide.hero.hp -= dmg;
+        String defSideStr = (defenderSide == state.sideA) ? "my" : "enemy";
+        
+        BattleLogEvent hpEvt = new BattleLogEvent();
+        hpEvt.type = Type.HERO_HP_CHANGE;
+        hpEvt.side = defSideStr;
+        hpEvt.value = -dmg; // Delta
+        hpEvt.desc = String.valueOf(defenderSide.hero.hp); // HpAfter
+        result.logEvents.add(hpEvt);
+        
+        if (defenderSide.hero.hp <= 0) {
+            defenderSide.hero.isDeadOrRetreated = true;
+            BattleLogEvent deadEvt = new BattleLogEvent();
+            deadEvt.type = Type.HERO_DEAD;
+            deadEvt.side = defSideStr;
+            result.logEvents.add(deadEvt);
         }
-        return 1.0;
     }
 
-    // --- Queue: ARC First ---
+    private void applyAoEDistributedTroopDamage(Side defenderSide, int totalDamage, TurnResult result, String targetSideStr) {
+        List<TroopStack> alive = getStrictPriorityTargets(defenderSide);
+        if (alive.isEmpty() || totalDamage <= 0) return;
+        int n = alive.size();
+        int base = totalDamage / n;
+        int remainder = totalDamage % n;
+        for (int i = 0; i < n; i++) {
+            int dmg = base + (i < remainder ? 1 : 0);
+            if (dmg <= 0) continue;
+            TroopStack target = alive.get(i);
+            int countBefore = target.count;
+            TroopDamage.DamageOutcome outcome = TroopDamage.applyDamage(target, dmg);
+
+            BattleLogEvent stEvt = new BattleLogEvent();
+            stEvt.type = Type.TROOP_STACK_CHANGE;
+            stEvt.side = targetSideStr;
+            stEvt.troopType = target.type;
+            stEvt.killed = outcome.killedCount;
+            stEvt.countBefore = countBefore;
+            stEvt.countAfter = target.count;
+            result.logEvents.add(stEvt);
+        }
+    }
+
     private List<Actor> determineActionQueue(BattleState state) {
         List<Actor> q = new ArrayList<>();
         
-        // 1. ARC Phase
-        addAllTroopsByType(q, state, "ARC");
+        boolean isSolo = "HERO_SOLO".equals(state.phase);
         
-        // 2. Hero Phase (Inserted here for interaction flow)
+        if (isSolo) {
+             q.add(new Actor(state.sideA, true, null));
+             q.add(new Actor(state.sideB, true, null));
+             Collections.sort(q, (a, b) -> b.side.hero.speed - a.side.hero.speed);
+             return q;
+        }
+
+        // WAR Phase:
+        // 1. ARC
+        addAllTroopsByType(q, state, "ARC");
+        // 2. Hero
         q.add(new Actor(state.sideA, true, null));
         q.add(new Actor(state.sideB, true, null));
-        
-        // 3. Other Troops
+        // 3. Others
         addAllTroopsByType(q, state, "INF");
         addAllTroopsByType(q, state, "CAV");
         
         return q;
     }
     
-    // --- Existing Helpers ---
+    private void checkBattleEnd(BattleState state, TurnResult result) {
+        // V3 Rule: "一方没有任何可战斗单位" (Hero Dead/Retreated AND Troops Count=0)
+        boolean aLost = !canFight(state.sideA);
+        boolean bLost = !canFight(state.sideB);
+        
+        if (aLost || bLost) {
+            state.isFinished = true;
+            state.isWin = bLost && !aLost;
+            
+            BattleLogEvent endEvt = new BattleLogEvent();
+            endEvt.type = Type.BATTLE_END;
+            endEvt.value = state.isWin ? 1 : 0; // 1=Win
+            result.logEvents.add(endEvt);
+        }
+    }
 
+    private void maybeSwitchToTroopWar(BattleState state, TurnResult result) {
+        if (!"HERO_SOLO".equals(state.phase)) return;
+        if (state.isFinished) return;
+        if (!shouldEnterTroopWar(state)) return;
+
+        BattleLogEvent evt = new BattleLogEvent();
+        evt.type = Type.PHASE_CHANGE;
+        evt.fromPhase = "HERO_SOLO";
+        evt.toPhase = "TROOP_WAR";
+        evt.myHeroCanFight = state.sideA != null && state.sideA.hero != null && state.sideA.hero.isAlive();
+        evt.enemyHeroCanFight = state.sideB != null && state.sideB.hero != null && state.sideB.hero.isAlive();
+        evt.desc = "进入全军出击阶段";
+        evt.phase = Phase.TROOP_WAR;
+        result.logEvents.add(evt);
+
+        state.phase = "TROOP_WAR";
+        state.currentActorIndex = 0;
+    }
+
+    private boolean shouldEnterTroopWar(BattleState state) {
+        boolean myHeroAlive = state.sideA != null && state.sideA.hero != null && state.sideA.hero.isAlive();
+        boolean enemyHeroAlive = state.sideB != null && state.sideB.hero != null && state.sideB.hero.isAlive();
+        return !myHeroAlive || !enemyHeroAlive;
+    }
+    
+    private boolean canFight(Side side) {
+        // Hero Alive OR Any Troop > 0
+        if (side.hero.isAlive()) return true;
+        for (TroopStack s : side.troops) {
+            if (s.count > 0) return true;
+        }
+        return false;
+    }
+
+    private String applyEliteTroopEffects(BattleState state, TroopStack attacker, Side attackerSide, Side defenderSide, TurnResult result) {
+        switch (attacker.troopId) {
+            case 3001:
+                return applyHealerElite(state, attacker, attackerSide, result);
+            case 3002:
+                return "AOE分散: 对敌方所有兵堆栈均摊伤害";
+            case 3003:
+                attackerSide.heroAtkRatePermille = 1300;
+                attackerSide.heroAtkRateTurns = 2;
+                return "英雄增益: 本方英雄攻击+30%(2回合)";
+            case 3004:
+                defenderSide.troopAtkRatePermille = 750;
+                defenderSide.troopAtkRateTurns = 2;
+                return "敌军减攻: 敌方小兵攻击-25%(2回合)";
+            default:
+                return null;
+        }
+    }
+
+    private String applyHealerElite(BattleState state, TroopStack attacker, Side attackerSide, TurnResult result) {
+        int heroHeal = Math.max(60, attacker.count * 2);
+        int before = attackerSide.hero.hp;
+        attackerSide.hero.hp = Math.min(attackerSide.hero.maxHp, attackerSide.hero.hp + heroHeal);
+        int actualHeal = attackerSide.hero.hp - before;
+
+        String sideStr = (attackerSide == state.sideA) ? "my" : "enemy";
+        if (actualHeal > 0) {
+            BattleLogEvent hpEvt = new BattleLogEvent();
+            hpEvt.type = Type.HERO_HP_CHANGE;
+            hpEvt.side = sideStr;
+            hpEvt.value = actualHeal;
+            hpEvt.desc = String.valueOf(attackerSide.hero.hp);
+            result.logEvents.add(hpEvt);
+        }
+
+        int troopHealedStacks = 0;
+        for (TroopStack s : attackerSide.troops) {
+            if (s.count <= 0) continue;
+            int healFront = Math.max(1, s.unitHp / 4);
+            int oldFront = s.frontHp;
+            s.frontHp = Math.min(s.unitHp, s.frontHp + healFront);
+            if (s.frontHp > oldFront) {
+                troopHealedStacks++;
+            }
+        }
+        return "治疗支援: 英雄+" + actualHeal + ", 兵线恢复" + troopHealedStacks + "队";
+    }
+
+    private void normalizeSideTempEffects(BattleState state) {
+        normalizeSingleSideTempEffects(state.sideA);
+        normalizeSingleSideTempEffects(state.sideB);
+    }
+
+    private void normalizeSingleSideTempEffects(Side side) {
+        if (side == null) return;
+        if (side.heroAtkRatePermille <= 0) side.heroAtkRatePermille = 1000;
+        if (side.troopAtkRatePermille <= 0) side.troopAtkRatePermille = 1000;
+    }
+
+    private void decayTemporarySideEffects(BattleState state) {
+        decaySingleSideTempEffects(state.sideA);
+        decaySingleSideTempEffects(state.sideB);
+    }
+
+    private void decaySingleSideTempEffects(Side side) {
+        if (side == null) return;
+        if (side.heroAtkRateTurns > 0) {
+            side.heroAtkRateTurns--;
+            if (side.heroAtkRateTurns <= 0) {
+                side.heroAtkRatePermille = 1000;
+            }
+        }
+        if (side.troopAtkRateTurns > 0) {
+            side.troopAtkRateTurns--;
+            if (side.troopAtkRateTurns <= 0) {
+                side.troopAtkRatePermille = 1000;
+            }
+        }
+    }
+
+    private int applyRate(int base, int permille) {
+        int p = permille <= 0 ? 1000 : permille;
+        return Math.max(1, (int) Math.round(base * (p / 1000.0)));
+    }
+
+    // --- Basic Helpers ---
+    
     private void addAllTroopsByType(List<Actor> queue, BattleState state, String type) {
         for (TroopStack s : state.sideA.troops) {
             if (s.type.equalsIgnoreCase(type) && s.count > 0) queue.add(new Actor(state.sideA, false, s));
@@ -337,9 +526,7 @@ public class BattleEngine {
     }
 
     private TroopStack findStack(Side side, String type) {
-        for (TroopStack s : side.troops) {
-            if (s.type.equalsIgnoreCase(type)) return s;
-        }
+        for (TroopStack s : side.troops) { if (s.type.equalsIgnoreCase(type)) return s; }
         return null;
     }
 
@@ -347,60 +534,24 @@ public class BattleEngine {
         return mySide == state.sideA ? state.sideB : state.sideA;
     }
     
-    private String getCounterTargetType(String type) {
-         if (type.equals("INF")) return "ARC";
-         if (type.equals("ARC")) return "CAV";
-         if (type.equals("CAV")) return "INF";
-         return "INF";
-    }
-
-    private void applyHeroDamage(String attackerName, Hero target, int dmg, TurnResult result, BattleState state, Side defenderSide) {
-        // Simplified Logic, assuming V2.8 rules
-        // Personality checks omitted for brevity but should be here
-        target.hp -= dmg;
-        result.logEvents.add(new BattleLogEvent(Type.ATTACK, attackerName, "Hero", dmg, "Target HP: " + target.hp));
-        if (target.hp <= 0) {
-            target.isDeadOrRetreated = true;
-            result.logEvents.add(new BattleLogEvent(Type.HERO_DOWN, attackerName, target.name, 0, "Dead"));
+    private List<TroopStack> getStrictPriorityTargets(Side side) {
+        List<TroopStack> list = new ArrayList<>();
+        // 1. Special Troops (troopId 3000+ or type ELITE_*)
+        for (TroopStack s : side.troops) {
+            if (s.count > 0 && (s.troopId >= 3000 || s.type.startsWith("ELITE"))) list.add(s);
         }
-    }
-
-    private void checkBattleEnd(BattleState state, TurnResult result) {
-        boolean sideADead = !state.sideA.hero.isAlive() && isEmpty(state.sideA.troops); 
-        boolean sideBDead = !state.sideB.hero.isAlive() && isEmpty(state.sideB.troops);
-        // Requirement: Hero Dead OR All Troops Dead? Usually Hero Dead = Loss in this user's earlier docs.
-        // V2.8 12.3: "Hero dead/retreat -> Hero no longer acts". Doesn't explicitly say Battle End.
-        // But usually "Wipe out" or "Hero Dead" is condition.
-        // Let's stick to: Hero Dead = Loss OR All Units Dead = Loss.
-        // For now: Hero Dead = Loss.
-        
-        // Wait, V2.8 Section 12 says "Hero retreat -> Hero no longer acts". It implies battle continues with troops!
-        // So defeat condition must be: All Troops Dead AND Hero Dead/Retreated.
-        
-        boolean aLost = state.sideA.hero.isDeadOrRetreated && allTroopsDead(state.sideA);
-        boolean bLost = state.sideB.hero.isDeadOrRetreated && allTroopsDead(state.sideB);
-        
-        if (aLost || bLost) {
-            state.isFinished = true;
-            state.isWin = bLost && !aLost;
-        }
-    }
-
-    private boolean allTroopsDead(Side side) {
-        return side.troops.stream().allMatch(t -> t.count <= 0);
+        // 2. Standard Types
+        addIfValid(list, findStack(side, "ARC"));
+        addIfValid(list, findStack(side, "CAV"));
+        addIfValid(list, findStack(side, "INF"));
+        return list;
     }
     
-    private boolean isEmpty(List<TroopStack> t) { return t.stream().allMatch(s -> s.count <= 0); }
-
-    // Logic Helpers
-    private boolean isActorStunned(BattleState state, Actor actor) {
-        // Simplified
-        return false;
+    private void addIfValid(List<TroopStack> list, TroopStack s) {
+        if (s != null && s.count > 0) list.add(s);
     }
 
-    private void consumeStun(BattleState state, Actor actor) {
-        // Simplified
-    }
+    private boolean isActorStunned(BattleState state, Actor actor) { return false; } // Stub
 
     private static class Actor {
         Side side;

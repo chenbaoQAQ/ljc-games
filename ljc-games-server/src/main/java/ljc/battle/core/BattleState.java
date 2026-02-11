@@ -17,6 +17,8 @@ public class BattleState {
     public int currentActorIndex; // 当前行动者索引 (0=HeroA, 1=HeroB, 2=InfA, ...)
     public long rngSeed;    // 随机种子
     public int actionNo;    // 行动计数，用于回放和随机数生成
+    
+    public String phase;    // HERO_SOLO, TROOP_WAR (V3.0)
 
     public Map<String, List<StatusEffect>> statusesA; // Key: "Hero", "INF", etc.
     public Map<String, List<StatusEffect>> statusesB;
@@ -40,6 +42,11 @@ public class BattleState {
         public String userId;    // 玩家ID or NPC
         public Hero hero;        // 英雄信息
         public List<TroopStack> troops; // 兵种堆栈列表: INF, ARC, CAV (必须按顺序/类型)
+        // Temporary side effects used by elite troops.
+        public int heroAtkRatePermille = 1000;
+        public int heroAtkRateTurns = 0;
+        public int troopAtkRatePermille = 1000;
+        public int troopAtkRateTurns = 0;
 
         public Side() {
             troops = new ArrayList<>();

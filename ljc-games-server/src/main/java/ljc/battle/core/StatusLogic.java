@@ -49,13 +49,25 @@ public class StatusLogic {
                     // Apply DMG
                     if (targetId.equals("Hero")) {
                         side.hero.hp -= BattleConstants.VAL_POISON_DMG;
-                        logs.add(new BattleLogEvent(BattleLogEvent.Type.POISON_TICK, "SYSTEM", sideName + ".Hero", BattleConstants.VAL_POISON_DMG, "Poison Dmg"));
+                        
+                        BattleLogEvent poisonEvt = new BattleLogEvent();
+                        poisonEvt.type = BattleLogEvent.Type.HERO_HP_CHANGE;
+                        poisonEvt.side = (side == state.sideA) ? "my" : "enemy";
+                        poisonEvt.value = -BattleConstants.VAL_POISON_DMG;
+                        poisonEvt.desc = "Poison Damage";
+                        logs.add(poisonEvt);
                     }
                 } else if (ef.type == StatusEffect.StatusType.HOT) {
                     // Apply Heal
                     if (targetId.equals("Hero")) {
                          side.hero.hp = Math.min(side.hero.maxHp, side.hero.hp + BattleConstants.VAL_HOT_HEAL);
-                         logs.add(new BattleLogEvent(BattleLogEvent.Type.HEAL, "SYSTEM", sideName + ".Hero", BattleConstants.VAL_HOT_HEAL, "HoT Heal"));
+                         
+                         BattleLogEvent healEvt = new BattleLogEvent();
+                         healEvt.type = BattleLogEvent.Type.HERO_HP_CHANGE;
+                         healEvt.side = (side == state.sideA) ? "my" : "enemy";
+                         healEvt.value = BattleConstants.VAL_HOT_HEAL;
+                         healEvt.desc = "Heal";
+                         logs.add(healEvt);
                     }
                 }
                 

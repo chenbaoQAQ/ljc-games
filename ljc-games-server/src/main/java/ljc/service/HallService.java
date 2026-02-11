@@ -470,6 +470,7 @@ public class HallService {
                 long cap = (gt.getBaseCapacity() != null ? gt.getBaseCapacity().longValue() : 5L) + (g.getLevel() - 1);
                 // ATK: Base + (Level-1)*5
                 long atk = (gt.getBaseAtk() != null ? gt.getBaseAtk() : 50L) + (g.getLevel() - 1) * 5L;
+                int speed = (gt.getSpeed() != null ? gt.getSpeed() : 50);
                 
                 // Equipments Bonus
                 for (UserEquipmentTbl eq : allEquips) {
@@ -479,6 +480,7 @@ public class HallService {
                             // Base from Equip
                             atk += (et.getBaseAtk() != null ? et.getBaseAtk() : 0L);
                             baseHp += (et.getBaseHp() != null ? et.getBaseHp() : 0L);
+                            speed += (et.getBaseSpd() != null ? et.getBaseSpd().intValue() : 0);
                             
                             // Enhance Bonus: +10% per level?
                             int elv = (eq.getEnhanceLevel() != null ? eq.getEnhanceLevel() : 0);
@@ -507,6 +509,7 @@ public class HallService {
                 vo.setMaxHp(baseHp);
                 vo.setAtk(atk);
                 vo.setCapacity(cap);
+                vo.setSpeed(speed);
             }
             
             // Skill
@@ -549,6 +552,7 @@ public class HallService {
                  vo.setSlot(tpl.getSlot());
                  vo.setBaseAtk(tpl.getBaseAtk());
                  vo.setBaseHp(tpl.getBaseHp());
+                 vo.setBaseSpd(tpl.getBaseSpd());
              }
              result.add(vo);
         }
@@ -567,4 +571,3 @@ public class HallService {
         return userInventoryMapper.selectByUserId(userId);
     }
 }
-

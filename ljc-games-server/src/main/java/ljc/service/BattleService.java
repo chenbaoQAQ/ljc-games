@@ -81,6 +81,7 @@ public class BattleService {
         // 6. Create Battle State
         BattleState state = new BattleState();
         state.turnNo = 0;
+        state.phase = "HERO_SOLO";
         state.sideA = sideA;
         state.sideB = sideB;
         state.rngSeed = System.currentTimeMillis();
@@ -548,6 +549,7 @@ public class BattleService {
         ctx.setNextActorDesc(state.nextActorDesc);
         ctx.setLastEvents(logs);
         ctx.setTurnNo((long)state.turnNo);
+        ctx.setPhase(state.phase);
         ctx.setFinished(state.isFinished);
         ctx.setWin(state.isWin);
 

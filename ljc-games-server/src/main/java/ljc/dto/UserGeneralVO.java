@@ -20,6 +20,7 @@ public class UserGeneralVO {
     
     // Calculated Stat
     private Long atk;
+    private Integer speed;
     
     // Skill Info
     private Integer currentSkillId;

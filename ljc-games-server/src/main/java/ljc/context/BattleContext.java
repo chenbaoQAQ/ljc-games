@@ -35,6 +35,7 @@ public class BattleContext {
     private String nextActorDesc;
     private List<ljc.battle.core.BattleLogEvent> lastEvents;
     private Long turnNo;
+    private String phase;
     // isFinished/isWin exist above as primitives (boolean)
 
     

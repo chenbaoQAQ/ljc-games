@@ -73,7 +73,9 @@ INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_ca
 -- 5. 插入装备模板
 INSERT INTO equipment_template (template_id, slot, name, base_atk, base_hp, base_spd, base_capacity, enhance_growth_json) VALUES
     (1, 'weapon', '铁剑', 10, 0, 0, 0, '{"atk": 5}'),
-    (2, 'armor1', '皮甲', 0, 50, 0, 0, '{"hp": 20}');
+    (2, 'armor1', '皮甲', 0, 50, 0, 0, '{"hp": 20}'),
+    (3, 'helm', '轻钢盔', 0, 30, 4, 0, '{"hp": 10, "spd": 1}'),
+    (4, 'boots', '疾风靴', 0, 0, 8, 0, '{"spd": 2}');
 
 -- 6. 插入宝石模板
 INSERT INTO gem_template (gem_type, gem_level, stat_value) VALUES
@@ -95,7 +97,9 @@ INSERT INTO user_generals (user_id, template_id, unlocked, activated, level, cur
 -- 8.2 初始装备 (未穿戴)
 INSERT INTO user_equipments (user_id, template_id, enhance_level, general_id, slot, is_locked) VALUES
     (1, 1, 0, NULL, NULL, 0), -- 铁剑
-    (1, 2, 0, NULL, NULL, 0); -- 皮甲
+    (1, 2, 0, NULL, NULL, 0), -- 皮甲
+    (1, 3, 0, NULL, NULL, 0), -- 轻钢盔
+    (1, 4, 0, NULL, NULL, 0); -- 疾风靴
 
 -- 8.3 初始宝石
 INSERT INTO user_gems (user_id, gem_type, gem_level, stat_value, is_used) VALUES
@@ -221,6 +225,99 @@ INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlo
 ('GB', 1, 2301, NULL),
 ('GB', 5, 2302, NULL),
 ('GB', 10, 2303, NULL);
+
+-- 10. V1数值补丁（武将基础值 + 特种兵定位 + 技能书补齐）
+-- 说明：
+-- 1) 这里用 ON DUPLICATE KEY 做“覆盖式配置”，方便你反复初始化。
+-- 2) 特种兵 4 个定位先落在模板与命名层；具体“治疗/AOE/Buff/减攻”效果由战斗逻辑实现。
+INSERT INTO skill_template (skill_id, name, description, skill_type, cooldown_turns, trigger_timing, effect_json) VALUES
+    (1, '鼓舞', '奶自己（一大口+持续回血）', 'ACTIVE', 3, 'NONE', '{"kind":"heal_self_hot","instant":240,"hotTurns":2,"hotPerTurn":80}'),
+    (2, '乱舞', '攻击敌方武将并溅射敌方三兵种', 'ACTIVE', 3, 'NONE', '{"kind":"hero_splash_troops","heroRatio":1.0,"troopRatio":0.55}'),
+    (3, '毒箭', '对敌方武将造成伤害并附加中毒', 'ACTIVE', 3, 'NONE', '{"kind":"hero_poison","poisonTurns":2,"poisonPerTurn":70}'),
+    (4, '威压', '对敌方武将造成伤害并概率眩晕1回合', 'ACTIVE', 3, 'NONE', '{"kind":"hero_stun","chance":0.5,"stunTurns":1}'),
+    (5, '铁壁', '给全队套1回合护盾/免疫效果', 'ACTIVE', 4, 'NONE', '{"kind":"team_immune","turns":1}'),
+    (6, '伏兵', '武将对决阶段触发弓手额外齐射', 'ACTIVE', 4, 'NONE', '{"kind":"ambush_archer_volley","ratio":0.7}')
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    description = VALUES(description),
+    skill_type = VALUES(skill_type),
+    cooldown_turns = VALUES(cooldown_turns),
+    trigger_timing = VALUES(trigger_timing),
+    effect_json = VALUES(effect_json);
+
+INSERT INTO skill_book_map (item_id, skill_id) VALUES
+    (301, 1),
+    (302, 2),
+    (303, 3),
+    (304, 4),
+    (305, 5),
+    (306, 6)
+ON DUPLICATE KEY UPDATE
+    skill_id = VALUES(skill_id);
+
+INSERT INTO user_inventory (user_id, item_id, count) VALUES
+    (1, 301, 10),
+    (1, 302, 6),
+    (1, 303, 6),
+    (1, 304, 6),
+    (1, 305, 6),
+    (1, 306, 6)
+ON DUPLICATE KEY UPDATE
+    count = VALUES(count);
+
+INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
+    -- CN：治疗向、坦中速
+    (1001, 'CN', '刘备', 62, 980, 7, 62, 'STOIC', 0, 20, 1),
+    (1002, 'CN', '关羽', 88, 1160, 7, 72, 'BERSERKER', 1200, 20, 2),
+    (1003, 'CN', '张飞', 96, 1320, 8, 58, 'BERSERKER', 1800, 20, 4),
+    (1004, 'CN', '赵云', 92, 1080, 8, 82, 'STOIC', 2400, 20, 6),
+    -- JP：AOE与爆发倾向
+    (2001, 'JP', '织田信长', 84, 1020, 7, 76, 'BERSERKER', 0, 20, 2),
+    (2002, 'JP', '真田幸村', 90, 1100, 7, 80, 'BERSERKER', 1200, 20, 3),
+    (2003, 'JP', '德川家康', 74, 1240, 8, 66, 'STOIC', 2200, 20, 5),
+    -- KR：偏Buff与控场
+    (2201, 'KR', '李舜臣', 78, 1120, 8, 70, 'STOIC', 0, 20, 5),
+    (2202, 'KR', '金庾信', 82, 1060, 8, 74, 'STOIC', 1200, 20, 1),
+    (2203, 'KR', '乙支文德', 94, 1180, 8, 78, 'BERSERKER', 2200, 20, 4),
+    -- GB：偏减益与压制
+    (2301, 'GB', '亚瑟', 80, 1140, 8, 68, 'STOIC', 0, 20, 5),
+    (2302, 'GB', '兰斯洛特', 92, 1080, 7, 84, 'BERSERKER', 1400, 20, 3),
+    (2303, 'GB', '莫德雷德', 98, 1200, 8, 79, 'BERSERKER', 2400, 20, 4)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    base_atk = VALUES(base_atk),
+    base_hp = VALUES(base_hp),
+    base_capacity = VALUES(base_capacity),
+    speed = VALUES(speed),
+    personality_code = VALUES(personality_code),
+    activate_gold_cost = VALUES(activate_gold_cost),
+    max_level_tier0 = VALUES(max_level_tier0),
+    default_skill_id = VALUES(default_skill_id);
+
+INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, base_atk, base_hp, recruit_gold_cost, unlock_civ_required) VALUES
+    -- 特种兵定位：
+    -- 3001 治疗、3002 AOE分流、3003 英雄Buff、3004 敌军减攻（当前版本先体现在定位与数值）
+    (3001, 'CN', '青囊医官', 'ARC', 1, 2, 30, 82, 120, 1),
+    (3002, 'JP', '爆裂火筒队', 'ARC', 1, 2, 44, 68, 130, 1),
+    (3003, 'KR', '军乐旗卫', 'INF', 1, 2, 36, 108, 130, 1),
+    (3004, 'GB', '破甲工兵', 'INF', 1, 2, 38, 116, 140, 1)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    troop_type = VALUES(troop_type),
+    is_elite = VALUES(is_elite),
+    cost = VALUES(cost),
+    base_atk = VALUES(base_atk),
+    base_hp = VALUES(base_hp),
+    recruit_gold_cost = VALUES(recruit_gold_cost),
+    unlock_civ_required = VALUES(unlock_civ_required);
+
+INSERT INTO user_troops (user_id, troop_id, count) VALUES
+    (1, 3001, 120),
+    (1, 3002, 120),
+    (1, 3003, 120),
+    (1, 3004, 120)
+ON DUPLICATE KEY UPDATE
+    count = VALUES(count);
 
 -- 重新启用外键检查
 SET FOREIGN_KEY_CHECKS = 1;

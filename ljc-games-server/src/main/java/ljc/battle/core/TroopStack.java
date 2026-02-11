@@ -7,6 +7,7 @@ package ljc.battle.core;
 public class TroopStack {
     public int troopId;       // 对应 troop_template.troop_id（用于战后结算）
     public String type;       // INF/ARC/CAV/ELITE_*
+    public String name;       // Nice Name
     public int count;         // 当前存活数量
     public int unitHp;        // 单个单位最大HP
     public int frontHp;       // 当前最前排单位剩余HP (1..unitHp)

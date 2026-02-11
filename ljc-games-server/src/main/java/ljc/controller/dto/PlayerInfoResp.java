@@ -8,6 +8,7 @@ public class PlayerInfoResp {
     // 1. 基础信息 (把 UserTbl 里的东西拆出来放)
     private Long id;
     private String nickname;
+    private String initialCiv;
     private Long gold;      // 注意：UserTbl里是 Long
     private Long diamond;   // 注意：UserTbl里是 Long
 

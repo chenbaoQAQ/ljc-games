@@ -22,7 +22,18 @@
     </update>
 
     <select id="selectByUserId" resultType="ljc.entity.UserGeneralTbl">
-        SELECT * FROM user_generals WHERE user_id = #{userId}
+        SELECT
+            ug.*,
+            gt.name AS name,
+            (gt.base_atk + (ug.level - 1) * 10) AS atk,
+            gt.speed AS speed,
+            st.name AS skill_name,
+            st.description AS skill_desc
+        FROM user_generals ug
+        LEFT JOIN general_template gt ON gt.template_id = ug.template_id
+        LEFT JOIN user_general_skill ugs ON ugs.general_id = ug.id
+        LEFT JOIN skill_template st ON st.skill_id = ugs.current_skill_id
+        WHERE ug.user_id = #{userId}
     </select>
     <select id="selectById" resultType="ljc.entity.UserGeneralTbl">
         SELECT * FROM user_generals WHERE id = #{id}

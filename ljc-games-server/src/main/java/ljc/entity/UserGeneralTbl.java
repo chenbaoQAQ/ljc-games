@@ -16,8 +16,12 @@ public class UserGeneralTbl {
     private Long maxHp;
     private Integer restTurns;
     private Integer capacity;
-    
-
+    // 展示字段（由查询 join 填充）
+    private String name;
+    private Long atk;
+    private Integer speed;
+    private String skillName;
+    private String skillDesc;
 
     private LocalDateTime createdAt;
 }

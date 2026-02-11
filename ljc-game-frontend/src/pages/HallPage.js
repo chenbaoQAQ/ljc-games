@@ -1,5 +1,6 @@
 import { playerAPI, hallAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
+import { CIV_BASE_TROOP } from '../config/gameData.js';
 
 export function HallPage(container) {
   const userId = localStorage.getItem('userId');
@@ -338,19 +339,23 @@ export function HallPage(container) {
         document.getElementById('gold-count').textContent = (result.data.gold || 0).toLocaleString();
         document.getElementById('diamond-count').textContent = (result.data.diamond || 0).toLocaleString();
 
-        // 更新兵力显示 - troopId: xx01=步兵(INF), xx02=弓兵(ARC), xx03=骑兵(CAV)
+        // 更新兵力显示：仅显示当前国家的三基础兵种，不做全国家汇总
         if (result.data.troops) {
-          // 按兵种类型汇总（同一用户可能有多国兵种）
-          let infTotal = 0, arcTotal = 0, cavTotal = 0;
+          const civ = result.data.initialCiv || 'CN';
+          const base = CIV_BASE_TROOP[civ] || 2000;
+
+          const troopMap = {};
           result.data.troops.forEach(troop => {
-            const suffix = troop.troopId % 100;
-            if (suffix === 1) infTotal += (troop.count || 0);
-            else if (suffix === 2) arcTotal += (troop.count || 0);
-            else if (suffix === 3) cavTotal += (troop.count || 0);
+            troopMap[troop.troopId] = troop.count || 0;
           });
-          document.getElementById('inf-count').textContent = infTotal.toLocaleString();
-          document.getElementById('arc-count').textContent = arcTotal.toLocaleString();
-          document.getElementById('cav-count').textContent = cavTotal.toLocaleString();
+
+          const inf = troopMap[base + 1] || 0;
+          const arc = troopMap[base + 2] || 0;
+          const cav = troopMap[base + 3] || 0;
+
+          document.getElementById('inf-count').textContent = inf.toLocaleString();
+          document.getElementById('arc-count').textContent = arc.toLocaleString();
+          document.getElementById('cav-count').textContent = cav.toLocaleString();
         }
       } else {
         console.warn('加载玩家数据: code不为200', result);

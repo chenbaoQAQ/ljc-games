@@ -1,5 +1,6 @@
 import { battleAPI, hallAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
+import { getTroopTypeName } from '../config/gameData.js';
 
 export function BattlePage(container, params) {
     const userId = localStorage.getItem('userId');
@@ -16,7 +17,10 @@ export function BattlePage(container, params) {
     container.innerHTML = `
     <div class="battle-page">
       <div class="battle-header">
-        <div class="turn-indicator" id="turn-display">Battle Start</div>
+        <div class="turn-indicator">
+            <span id="turn-display">Battle Start</span>
+            <span id="phase-display" style="font-size:0.8em; margin-left:10px; background:#444; padding:2px 6px; border-radius:4px;">INIT</span>
+        </div>
         <button class="btn btn-sm btn-secondary" id="flee-btn">撤退</button>
       </div>
       
@@ -58,9 +62,9 @@ export function BattlePage(container, params) {
 
        <!-- 操作栏 -->
        <div class="action-bar" id="action-bar" style="flex-direction:column;gap:10px;height:auto;padding:10px;">
-          <div class="tactics-group" style="display:flex;gap:15px;color:#aaa;font-size:0.9rem;">
+          <div id="tactics-ui" style="display:flex;gap:15px;color:#aaa;font-size:0.9rem;">
               <span style="color:#ffd700">战术:</span>
-              <label><input type="radio" name="tactics" value="" checked>默认</label>
+              <label><input type="radio" name="tactics" value="DEFAULT" checked>默认</label>
               <label><input type="radio" name="tactics" value="TARGET_INF">攻步</label>
               <label><input type="radio" name="tactics" value="TARGET_ARC">攻弓</label>
               <label><input type="radio" name="tactics" value="TARGET_CAV">攻骑</label>
@@ -204,84 +208,105 @@ export function BattlePage(container, params) {
         return '⚔️';
     }
 
-    function addLogs(events) {
-        if (!events) return;
-        const container = document.getElementById('logs-content');
-        events.forEach(ev => {
-            const div = document.createElement('div');
-            div.className = 'log-entry';
-            let msg = `[${ev.source}] used ${ev.action}`;
-            if (ev.value > 0) msg += ` caused <span class="log-dmg">${ev.value}</span> dmg`;
-            else msg += ` -> ${ev.desc}`;
-
-            div.innerHTML = msg;
-            container.prepend(div);
-        });
-    }
-
     function checkTurn() {
         if (!battleState) return;
 
-        if (battleState.isFinished) {
-            showResult(battleState.isWin);
-            return;
+        // Show Phase
+        const phaseEl = document.getElementById('phase-display');
+        const phaseCode = battleState.phase || 'HERO_SOLO';
+        if (phaseEl) {
+            const phase = (phaseCode === 'TROOP_WAR') ? "🔥 全军出击" : "⚔️ 武将单挑";
+            phaseEl.textContent = phase;
+            phaseEl.className = (phaseCode === 'TROOP_WAR') ? "phase-badge war" : "phase-badge solo";
         }
 
-        const nextActor = battleState.nextActorDesc || '';
-        const isMyTurn = nextActor === 'HeroA' || nextActor.endsWith('_A');
-        const isMyHero = nextActor === 'HeroA';
+        if (battleState.finished) {
+            showResult(battleState.win);
+            return;
+        }
 
         const statusEl = document.getElementById('action-status');
         const btnGroup = document.getElementById('action-buttons');
         const btnAttack = document.getElementById('btn-attack');
         const btnSkill = document.getElementById('btn-skill');
 
-        if (isMyTurn) {
-            statusEl.style.display = 'none';
-            btnGroup.style.display = 'flex';
+        // Always Player Control for Next Round
+        statusEl.style.display = 'none';
+        btnGroup.style.display = 'flex';
 
-            if (isMyHero) {
-                // Check Casting State
-                const hero = battleState.sideA.hero;
-                if (hero.castingSkillTurns > 0) {
-                    btnAttack.textContent = `⏳ 蓄力中... (剩${hero.castingSkillTurns}回合)`;
-                    btnSkill.style.display = 'none';
-                    btnAttack.onclick = () => doTurn(false);
-                } else {
-                    btnAttack.textContent = '⚔️ 主公普攻';
-                    btnSkill.textContent = '✨ 蓄力技能';
-                    btnSkill.style.display = 'inline-block';
-                    btnAttack.onclick = () => doTurn(false);
-                    btnSkill.onclick = () => doTurn(true);
-                }
-            } else {
-                // Troop Turn
-                const troopType = nextActor.split('_')[0];
-                const troopName = getTroopName(troopType);
-                btnAttack.textContent = `⚔️ ${troopName}进攻`;
-                btnSkill.style.display = 'none';
-                btnAttack.onclick = () => doTurn(false);
-            }
+        // Read direct mapped hero state from sideA.
+        const hero = battleState.sideA.hero;
+
+        btnAttack.textContent = `⚔️ ${battleState.currentTurn + 1}回合: 开始`;
+
+        if (phaseCode === 'TROOP_WAR') {
+            btnSkill.disabled = true;
+            btnSkill.textContent = `阶段2不可用`;
+        } else if ((hero.skillCd || 0) > 0) {
+            btnSkill.disabled = true;
+            btnSkill.textContent = `技能冷却 (${hero.skillCd})`;
         } else {
-            statusEl.style.display = 'block';
-            btnGroup.style.display = 'none';
-
-            let desc = nextActor;
-            if (desc === 'HeroB') desc = '敌方主将';
-            else if (desc.endsWith('_B')) desc = '敌方' + getTroopName(desc.split('_')[0]);
-
-            statusEl.textContent = `${desc} 行动中...`;
-
-            // Auto advance
-            if (!isProcessing) {
-                setTimeout(() => doTurn(false), 800);
-            }
+            btnSkill.disabled = false;
+            btnSkill.textContent = `✨ 释放技能`;
         }
+
+        btnAttack.onclick = () => doTurn(false);
+        btnSkill.onclick = () => doTurn(true);
+    }
+
+    function addLogs(events) {
+        if (!events) return;
+        const container = document.getElementById('logs-content');
+
+        // Process V3 Events
+        events.forEach(ev => {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            let msg = "";
+
+            // Map Type
+            switch (ev.type) {
+                case 'TURN_START':
+                    msg = `<span class="log-highlight">=== 第 ${ev.turn} 回合 ===</span>`;
+                    break;
+                case 'PHASE_CHANGE':
+                    msg = `<span class="log-highlight" style="font-size:1.1em">⚠️ 阶段切换: ${ev.fromPhase || 'HERO_SOLO'} -> ${ev.toPhase || 'TROOP_WAR'}</span>`;
+                    break;
+                case 'HERO_ATTACK':
+                    msg = `[${ev.actorSide === 'my' ? '我方' : '敌方'}] 主将普攻`;
+                    break;
+                case 'HERO_SKILL':
+                    msg = `[${ev.actorSide === 'my' ? '我方' : '敌方'}] 释放技能! (Dmg: ${ev.value})`;
+                    break;
+                case 'TROOP_ATTACK':
+                    // Show Roll
+                    const roll = ev.rollToHero || 0;
+                    msg = `[${ev.actorSide === 'my' ? '我方' : '敌方'}] ${getTroopName(ev.attackerTroopType)} 进攻! ` +
+                        `<span style="color:#ffd700">🎲Roll: ${roll}</span> ` +
+                        `(${roll}% 打主将, ${100 - roll}% 打兵)`;
+                    break;
+                case 'HERO_HP_CHANGE':
+                    const val = ev.value;
+                    msg = `> [${ev.side === 'my' ? '我方' : '敌方'}] 主将 ` +
+                        (val < 0 ? `<span class="log-dmg">HP ${val}</span>` : `<span class="log-heal">HP +${val}</span>`);
+                    break;
+                case 'TROOP_STACK_CHANGE':
+                    msg = `> [${ev.side === 'my' ? '我方' : '敌方'}] ${getTroopName(ev.troopType)}: ` +
+                        `<span class="log-dmg">损失 ${ev.killed} 单位</span> (Remaining: ${ev.countAfter})`;
+                    break;
+                default:
+                    // Legacy Fallback
+                    if (ev.desc) msg = ev.desc;
+                    else msg = JSON.stringify(ev);
+            }
+
+            div.innerHTML = msg;
+            container.prepend(div);
+        });
     }
 
     function getTroopName(type) {
-        const map = { 'INF': '步兵', 'ARC': '弓兵', 'CAV': '骑兵' };
-        return map[type] || type;
+        return getTroopTypeName(type);
     }
 
     async function doTurn(castSkill) {
