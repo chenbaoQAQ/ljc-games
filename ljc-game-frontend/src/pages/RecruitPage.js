@@ -1,6 +1,6 @@
-import { playerAPI, hallAPI } from '../api/index.js';
+import { playerAPI, hallAPI, troopAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
-import { TROOP_CATALOG } from '../config/gameData.js';
+import { getTroopMeta, getTroopTypeName } from '../config/gameData.js';
 
 export function RecruitPage(container) {
   const userId = localStorage.getItem('userId');
@@ -52,9 +52,9 @@ export function RecruitPage(container) {
 
   async function loadData() {
     try {
-      const [infoRes, progRes] = await Promise.all([
+      const [infoRes, codexRes] = await Promise.all([
         playerAPI.getInfo(userId),
-        hallAPI.getProgress(userId),
+        troopAPI.getCodex(userId),
       ]);
 
       const ownedTroopsMap = {};
@@ -63,16 +63,18 @@ export function RecruitPage(container) {
         (infoRes.data.troops || []).forEach(t => { ownedTroopsMap[t.troopId] = t.count || 0; });
       }
 
-      let unlockedCivs = ['CN'];
-      if (progRes.code === 200 && progRes.data) {
-        unlockedCivs = progRes.data.filter(p => p.unlocked).map(p => p.civ);
+      let codexList = [];
+      if (codexRes.code === 200 && codexRes.data) {
+        codexList = codexRes.data;
       }
 
-      const recruitList = Object.values(TROOP_CATALOG)
-        .filter(t => unlockedCivs.includes(t.civ))
-        .sort((a, b) => a.troopId - b.troopId);
+      // Sort: Unlocked first, then by ID
+      codexList.sort((a, b) => {
+        if (a.status !== b.status) return b.status - a.status; // 2=Unlocked, 1=Discovered, 0=Locked
+        return a.troopId - b.troopId;
+      });
 
-      renderTroops(recruitList, ownedTroopsMap);
+      renderTroops(codexList, ownedTroopsMap);
     } catch (e) {
       console.error('加载数据失败:', e);
       document.getElementById('recruit-list').innerHTML = '<p style="text-align:center">加载失败</p>';
@@ -81,29 +83,46 @@ export function RecruitPage(container) {
 
   function renderTroops(troops, ownedMap) {
     const list = document.getElementById('recruit-list');
-    list.innerHTML = troops.map(t => `
-      <div class="recruit-card card" data-troop-id="${t.troopId}">
+    list.innerHTML = troops.map(t => {
+      // Merge with local meta for colors/icons (or backend should provide, but for now mix)
+      const meta = getTroopMeta(t.troopId);
+      const isLocked = t.status < 2; // 2=UNLOCKED
+      const opacity = isLocked ? '0.6' : '1';
+      const grayscale = isLocked ? 'filter: grayscale(1);' : '';
+
+      return `
+      <div class="recruit-card card" data-troop-id="${t.troopId}" style="${grayscale} opacity: ${opacity}">
         <div class="troop-header">
-          <div class="troop-avatar" style="background:${t.color};">${t.icon}</div>
+          <div class="troop-avatar" style="background:${meta.color};">${isLocked ? '🔒' : meta.icon}</div>
           <div>
             <h3>${t.name} ${t.isElite ? '<span style="font-size:.8em;color:#ffd166">[特种]</span>' : ''}</h3>
-            <p class="troop-desc">${t.type} · ${t.civ}</p>
+            <p class="troop-desc">${getTroopTypeName(t.type)} · ${t.civ}</p>
           </div>
         </div>
         <div class="troop-stats">
-          <span>当前拥有: <strong>${(ownedMap[t.troopId] || 0).toLocaleString()}</strong></span>
-          <span>单价: <strong>${t.recruitGold}</strong> 金</span>
+          ${isLocked
+          ? `<span><span style="color:#ef4444">未解锁</span>`
+          : `<span>当前: <strong>${(ownedMap[t.troopId] || 0).toLocaleString()}</strong></span>`
+        }
+          <span>单价: <strong>${meta.recruitGold}</strong> 金</span>
         </div>
-        <div class="recruit-controls">
-          <button class="btn btn-sm qty-btn" data-delta="-10">-10</button>
-          <button class="btn btn-sm qty-btn" data-delta="-1">-1</button>
-          <input type="number" class="recruit-input" id="qty-${t.troopId}" value="10" min="1" />
-          <button class="btn btn-sm qty-btn" data-delta="1">+1</button>
-          <button class="btn btn-sm qty-btn" data-delta="10">+10</button>
-        </div>
-        <button class="btn btn-primary recruit-btn" data-troop-id="${t.troopId}">招募${t.name}</button>
+        
+        ${isLocked ? `
+            <div style="font-size:0.9em; color:#ef4444; text-align:center; padding:10px; background:rgba(0,0,0,0.2); border-radius:4px;">
+                需通关 ${t.civ} 关卡解锁
+            </div>
+        ` : `
+            <div class="recruit-controls">
+              <button class="btn btn-sm qty-btn" data-delta="-10">-10</button>
+              <button class="btn btn-sm qty-btn" data-delta="-1">-1</button>
+              <input type="number" class="recruit-input" id="qty-${t.troopId}" value="10" min="1" />
+              <button class="btn btn-sm qty-btn" data-delta="1">+1</button>
+              <button class="btn btn-sm qty-btn" data-delta="10">+10</button>
+            </div>
+            <button class="btn btn-primary recruit-btn" data-troop-id="${t.troopId}">招募</button>
+        `}
       </div>
-    `).join('');
+    `}).join('');
 
     bindEvents();
   }

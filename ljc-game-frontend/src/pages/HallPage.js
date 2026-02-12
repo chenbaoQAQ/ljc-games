@@ -67,6 +67,7 @@ export function HallPage(container) {
             <button class="btn btn-secondary" id="equip-btn">装备强化</button>
             <button class="btn btn-secondary" id="gem-btn">宝石镶嵌</button>
             <button class="btn btn-secondary" id="skill-btn">技能学习</button>
+            <button class="btn btn-secondary" id="codex-btn">兵种图鉴</button>
             <button class="btn btn-secondary" id="tower-btn">爬塔挑战</button>
           </div>
         </div>
@@ -446,5 +447,6 @@ export function HallPage(container) {
   document.getElementById('equip-btn').addEventListener('click', () => { router.navigate('/equipment'); });
   document.getElementById('gem-btn').addEventListener('click', () => { router.navigate('/gem'); });
   document.getElementById('skill-btn').addEventListener('click', () => { router.navigate('/skill'); });
+  document.getElementById('codex-btn').addEventListener('click', () => { router.navigate('/codex'); });
   document.getElementById('tower-btn').addEventListener('click', () => { alert('爬塔功能敬请期待'); });
 }

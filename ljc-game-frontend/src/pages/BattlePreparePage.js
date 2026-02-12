@@ -1,4 +1,4 @@
-import { hallAPI, playerAPI, battleAPI } from '../api/index.js';
+import { hallAPI, playerAPI, battleAPI, troopAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
 import { getTroopMeta } from '../config/gameData.js';
 
@@ -87,23 +87,34 @@ export function BattlePreparePage(container, params) {
 
     async function init() {
         try {
-            const [gRes, pRes] = await Promise.all([
+            const [gRes, pRes, cRes] = await Promise.all([
                 hallAPI.getGenerals(userId),
-                playerAPI.getInfo(userId)
+                playerAPI.getInfo(userId),
+                troopAPI.getCodex(userId)
             ]);
 
             if (gRes.code === 200) {
                 generals = gRes.data.filter(g => g.activated);
                 renderGenerals();
             }
-            if (pRes.code === 200 && pRes.data.troops) {
-                const civBaseMap = { CN: 2000, JP: 2100, KR: 2200, GB: 2300 };
-                const base = civBaseMap[civ] || 2000;
-                const eliteByCiv = { CN: 3001, JP: 3002, KR: 3003, GB: 3004 };
-                const allow = new Set([base + 1, base + 2, base + 3, eliteByCiv[civ]]);
 
+            // Build unlocked set from Codex
+            const unlockedSet = new Set();
+            if (cRes.code === 200 && cRes.data) {
+                cRes.data.forEach(t => {
+                    // Filter: Must be Unlocked (status >= 2) AND Match current Civ context
+                    // (Assuming you can only deploy troops of the civ you are playing, 
+                    // or maybe the Stage Civ is the context. 
+                    // Let's assume 'civ' param determines the faction we are playing as for this battle config)
+                    if (t.status >= 2 && t.civ === civ) {
+                        unlockedSet.add(t.troopId);
+                    }
+                });
+            }
+
+            if (pRes.code === 200 && pRes.data.troops) {
                 userTroops = (pRes.data.troops || [])
-                    .filter(t => allow.has(t.troopId) && (t.count || 0) > 0)
+                    .filter(t => unlockedSet.has(t.troopId) && (t.count || 0) > 0)
                     .sort((a, b) => (a.troopId || 0) - (b.troopId || 0));
             }
         } catch (e) { console.error(e); }
