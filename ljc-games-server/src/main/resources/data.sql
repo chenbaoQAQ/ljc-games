@@ -325,6 +325,12 @@ INSERT INTO user_troops (user_id, troop_id, count) VALUES
 ON DUPLICATE KEY UPDATE
     count = VALUES(count);
 
+-- 8.7 初始解锁兵种 (否则新建号无法出战)
+-- 至少解锁 2001 (步兵)，确保能打第1关
+INSERT INTO user_troop_progress (user_id, troop_id, status, evolution_tier, evolution_unlocked) VALUES
+(1, 2001, 2, 0, 0)
+ON DUPLICATE KEY UPDATE status = VALUES(status);
+
 -- 同步我方初始武将实例数值（与模板对齐，便于直接测试）
 UPDATE user_generals
 SET level = 1, tier = 0, current_hp = 980, max_hp = 980, capacity = 12, unlocked = 1, activated = 1
