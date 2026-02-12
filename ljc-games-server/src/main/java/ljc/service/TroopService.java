@@ -18,6 +18,7 @@ public class TroopService {
     private final UserTroopProgressMapper userTroopProgressMapper;
     private final TroopEvolutionConfigMapper troopEvolutionConfigMapper;
     private final UserCivProgressMapper userCivProgressMapper; // For evolution requirement check
+    private final StoryUnlockConfigMapper storyUnlockConfigMapper; // For Codex hints
 
     // Status Constants
     public static final int STATUS_LOCKED = 0;
@@ -30,6 +31,12 @@ public class TroopService {
         // 1. 基础校验
         if (req.getCount() <= 0) {
             throw new RuntimeException("招募数量必须大于0");
+        }
+
+        // F1. Check Unlock
+        UserTroopProgressTbl progress = userTroopProgressMapper.selectByPrimaryKey(userId, req.getTroopId().intValue());
+        if (progress == null || progress.getStatus() == null || progress.getStatus() < STATUS_UNLOCKED) {
+             throw new RuntimeException("兵种未解锁，无法招募");
         }
 
         // 2. 获取兵种模板配置
@@ -67,6 +74,7 @@ public class TroopService {
             progress.setTroopId(troopId);
             progress.setStatus(STATUS_UNLOCKED);
             progress.setEvolutionTier(0);
+            progress.setEvolutionUnlocked((byte)0);
             userTroopProgressMapper.insert(progress);
         } else if (progress.getStatus() < STATUS_UNLOCKED) {
             progress.setStatus(STATUS_UNLOCKED);
@@ -90,11 +98,13 @@ public class TroopService {
             progress = new UserTroopProgressTbl();
             progress.setUserId(userId);
             progress.setTroopId(troopId);
-            progress.setStatus(STATUS_LOCKED); // Still locked, but knows about evolution? 
-            // Actually if we unlock evolution, we probably imply we know the troop.
-            // Let's assume unlocked status stays as is.
+            progress.setStatus(STATUS_LOCKED); 
             progress.setEvolutionTier(0);
+            progress.setEvolutionUnlocked((byte)1); // Mark unlocked
             userTroopProgressMapper.insert(progress);
+        } else if (progress.getEvolutionUnlocked() == null || progress.getEvolutionUnlocked() == 0) {
+            progress.setEvolutionUnlocked((byte)1);
+            userTroopProgressMapper.updateByPrimaryKey(progress);
         }
     }
 
@@ -106,7 +116,12 @@ public class TroopService {
              throw new RuntimeException("兵种未解锁");
         }
         
-        // 2. Find Next Config
+        // 2. Check Evolution Permission
+        if (progress.getEvolutionUnlocked() == null || progress.getEvolutionUnlocked() == 0) {
+             throw new RuntimeException("该兵种进化尚未解锁");
+        }
+        
+        // 3. Find Next Config
         int nextTier = progress.getEvolutionTier() + 1;
         ljc.entity.TroopEvolutionConfigTbl config = troopEvolutionConfigMapper.selectByTroopIdAndTier(troopId, nextTier);
         if (config == null) {
@@ -140,6 +155,17 @@ public class TroopService {
         java.util.List<TroopTemplateTbl> allTroops = troopTemplateMapper.selectAll();
         java.util.List<ljc.entity.UserTroopProgressTbl> userProgress = userTroopProgressMapper.selectByUserId(userId);
         
+        // Fetch all unlock configs to build hints
+        java.util.List<ljc.entity.StoryUnlockConfigTbl> unlockConfigs = storyUnlockConfigMapper.selectAll();
+        java.util.Map<Integer, ljc.entity.StoryUnlockConfigTbl> troopUnlockMap = new java.util.HashMap<>();
+        if (unlockConfigs != null) {
+            for (ljc.entity.StoryUnlockConfigTbl cfg : unlockConfigs) {
+                if (cfg.getUnlockTroopId() != null) {
+                    troopUnlockMap.put(cfg.getUnlockTroopId(), cfg);
+                }
+            }
+        }
+        
         // Map progress by troopId
         java.util.Map<Integer, ljc.entity.UserTroopProgressTbl> progressMap = new java.util.HashMap<>();
         if (userProgress != null) {
@@ -166,10 +192,22 @@ public class TroopService {
                 if (p != null) {
                     vo.setStatus(p.getStatus());
                     vo.setEvolutionTier(p.getEvolutionTier());
+                    vo.setEvolutionUnlocked(p.getEvolutionUnlocked() != null && p.getEvolutionUnlocked() == 1);
                 } else {
                     // Default locked
                     vo.setStatus(STATUS_LOCKED);
                     vo.setEvolutionTier(0);
+                    vo.setEvolutionUnlocked(false);
+                }
+                
+                // Populate Hint
+                ljc.entity.StoryUnlockConfigTbl cfg = troopUnlockMap.get(tpl.getTroopId());
+                if (cfg != null) {
+                    vo.setUnlockCiv(cfg.getCiv());
+                    vo.setUnlockStageNo(cfg.getStageNo());
+                    vo.setUnlockHint("通关 " + cfg.getCiv() + " 第" + cfg.getStageNo() + "关解锁");
+                } else {
+                    vo.setUnlockHint("暂未配置解锁条件");
                 }
                 
                 result.add(vo);

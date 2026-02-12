@@ -16,6 +16,11 @@ public class TroopCodexVO {
     
     // Requirements (If locked)
     private String unlockCiv; // e.g. "CN" if unlocked by CN stage
+    private Integer unlockStageNo;
+    private String unlockHint;
+    
+    // Evolution
+    private Boolean evolutionUnlocked;
     
     // Stats
     private Long baseAtk;

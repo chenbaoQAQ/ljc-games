@@ -24,6 +24,7 @@ public class HallService {
     private final UserInventoryMapper userInventoryMapper;
     private final UserGeneralSkillMapper userGeneralSkillMapper;
     private final EquipmentTemplateMapper equipmentTemplateMapper;
+    private final UserTroopProgressMapper userTroopProgressMapper;
 
     
     // 省略其他Mapper注入
@@ -283,6 +284,13 @@ public class HallService {
     public void recruit(Long userId, Integer troopId, Integer count) {
         if (count == null || count <= 0) {
             throw new RuntimeException("招募数量必须为正整数");
+        }
+
+        // A1. Check Unlock
+        UserTroopProgressTbl progress = userTroopProgressMapper.selectByPrimaryKey(userId, troopId);
+        if (progress == null || progress.getStatus() == null || progress.getStatus() < 2) { // 2=UNLOCKED (using magic number or constant if visible)
+             // Better refer to constant, but it's in TroopService. Let's assume 2.
+             throw new RuntimeException("兵种未解锁，无法招募");
         }
 
         TroopTemplateTbl tpl = troopTemplateMapper.selectById(troopId);

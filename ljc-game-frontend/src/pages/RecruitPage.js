@@ -109,7 +109,7 @@ export function RecruitPage(container) {
         
         ${isLocked ? `
             <div style="font-size:0.9em; color:#ef4444; text-align:center; padding:10px; background:rgba(0,0,0,0.2); border-radius:4px;">
-                需通关 ${t.civ} 关卡解锁
+                ${t.unlockHint || `需通关 ${t.civ} 关卡解锁`}
             </div>
         ` : `
             <div class="recruit-controls">

@@ -9,4 +9,7 @@ import org.apache.ibatis.annotations.Select;
 public interface StoryUnlockConfigMapper {
     @Select("SELECT * FROM story_unlock_config WHERE civ = #{civ} AND stage_no = #{stageNo}")
     StoryUnlockConfigTbl selectByCivAndStage(@Param("civ") String civ, @Param("stageNo") Integer stageNo);
+
+    @Select("SELECT * FROM story_unlock_config")
+    java.util.List<StoryUnlockConfigTbl> selectAll();
 }

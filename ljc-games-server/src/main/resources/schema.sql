@@ -481,6 +481,7 @@ CREATE TABLE IF NOT EXISTS user_troop_progress (
   troop_id INT NOT NULL,
   
   status INT NOT NULL DEFAULT 0, -- 0=LOCKED, 1=DISCOVERED(发现/可解锁), 2=UNLOCKED(已解锁/可招募)
+  evolution_unlocked TINYINT NOT NULL DEFAULT 0, -- 0=Locked, 1=Unlocked
   evolution_tier INT NOT NULL DEFAULT 0, -- 0=初始, 1=一阶...
   
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

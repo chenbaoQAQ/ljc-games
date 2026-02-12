@@ -162,7 +162,13 @@ INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlo
 INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ, unlock_troop_id, unlock_evolution_troop_id) VALUES
 ('JP', 1, 2001, NULL, 2101, NULL),
 ('JP', 5, 2002, NULL, 3002, NULL),
-('JP', 10, 2003, 'KR', NULL, NULL);
+('JP', 10, 2003, 'KR', NULL, NULL),
+('KR', 1, 2201, NULL, 2201, NULL),
+('KR', 5, 2202, NULL, 3003, NULL),
+('KR', 10, 2203, 'GB', NULL, NULL),
+('GB', 1, 2301, NULL, 2301, NULL),
+('GB', 5, 2302, NULL, 3004, NULL),
+('GB', 10, 2303, NULL, NULL, NULL);
 
 
 INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
@@ -220,17 +226,7 @@ INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, ene
 ('GB', 9, 'WALL', 100, 2000, 3, '{"hero":{"name":"Castle Guard","maxHp":5000,"currentHp":5000,"atk":150,"speed":75,"personality":"BERSERKER"},"troops":[{"troopId":2303,"type":"CAV","count":60,"unitHp":40,"frontHp":40}]}'),
 ('GB', 10, 'BOSS', 0, 2500, 5, '{"hero":{"name":"Warlord","maxHp":10000,"currentHp":10000,"atk":300,"speed":100,"personality":"BERSERKER"},"troops":[{"troopId":2303,"type":"CAV","count":110,"unitHp":50,"frontHp":50},{"troopId":2302,"type":"ARC","count":80,"unitHp":20,"frontHp":20}]}');
 
--- KR unlock config
-INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
-('KR', 1, 2201, NULL),
-('KR', 5, 2202, NULL),
-('KR', 10, 2203, 'GB');
 
--- GB unlock config
-INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
-('GB', 1, 2301, NULL),
-('GB', 5, 2302, NULL),
-('GB', 10, 2303, NULL);
 
 -- 10. V1数值补丁（武将基础值 + 特种兵定位 + 技能书补齐）
 -- 说明：

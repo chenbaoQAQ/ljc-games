@@ -13,6 +13,9 @@ public class UserTroopProgressTbl {
     // 0=初始, 1=一阶, ...
     private Integer evolutionTier;
     
+    // 0=未解锁进化, 1=已解锁
+    private Byte evolutionUnlocked;
+    
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime updatedAt;
 }

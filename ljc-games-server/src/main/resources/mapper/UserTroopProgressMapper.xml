@@ -3,14 +3,15 @@
 <mapper namespace="ljc.mapper.UserTroopProgressMapper">
 
     <insert id="insert">
-        INSERT INTO user_troop_progress (user_id, troop_id, status, evolution_tier)
-        VALUES (#{userId}, #{troopId}, #{status}, #{evolutionTier})
+        INSERT INTO user_troop_progress (user_id, troop_id, status, evolution_tier, evolution_unlocked)
+        VALUES (#{userId}, #{troopId}, #{status}, #{evolutionTier}, #{evolutionUnlocked})
     </insert>
 
     <update id="updateByPrimaryKey">
         UPDATE user_troop_progress
         SET status = #{status},
-            evolution_tier = #{evolutionTier}
+            evolution_tier = #{evolutionTier},
+            evolution_unlocked = #{evolutionUnlocked}
         WHERE user_id = #{userId} AND troop_id = #{troopId}
     </update>
 
