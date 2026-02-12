@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ljc.mapper.TroopEvolutionConfigMapper">
+
+    <select id="selectByTroopId" resultType="ljc.entity.TroopEvolutionConfigTbl">
+        SELECT * FROM troop_evolution_config WHERE troop_id = #{troopId}
+    </select>
+
+    <select id="selectByTroopIdAndTier" resultType="ljc.entity.TroopEvolutionConfigTbl">
+        SELECT * FROM troop_evolution_config 
+        WHERE troop_id = #{troopId} AND next_tier = #{nextTier}
+    </select>
+
+</mapper>

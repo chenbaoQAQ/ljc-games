@@ -34,6 +34,7 @@ public class BattleService {
     
     private final DropPoolMapper dropPoolMapper;
     private final ObjectMapper objectMapper;
+    private final TroopService troopService; // New Injection
 
     // The Engine (Stateless, reused)
     private final BattleEngine battleEngine = new BattleEngine();
@@ -508,6 +509,16 @@ public class BattleService {
                     np.setUnlocked(true);
                     userCivProgressMapper.update(np);
                 }
+            }
+            
+            // New: Unlock Troop
+            if (unlock.getUnlockTroopId() != null) {
+                troopService.unlockTroop(userId, unlock.getUnlockTroopId());
+            }
+            
+            // New: Unlock Evolution
+            if (unlock.getUnlockEvolutionTroopId() != null) {
+                troopService.unlockEvolution(userId, unlock.getUnlockEvolutionTroopId());
             }
         }
         

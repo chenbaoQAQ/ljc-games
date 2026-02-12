@@ -43,6 +43,10 @@ DROP TABLE IF EXISTS troop_template;
 DROP TABLE IF EXISTS general_template;
 DROP TABLE IF EXISTS personality_config;
 
+DROP TABLE IF EXISTS story_unlock_config;
+DROP TABLE IF EXISTS user_troop_progress;
+DROP TABLE IF EXISTS troop_evolution_config;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =========================================================
@@ -465,6 +469,39 @@ CREATE TABLE IF NOT EXISTS story_unlock_config (
   stage_no INT NOT NULL,
   unlock_general_template_id INT DEFAULT NULL, -- 通关奖励武将
   unlock_next_civ VARCHAR(10) DEFAULT NULL,    -- 通关解锁国家
+  unlock_troop_id INT DEFAULT NULL,            -- 通关解锁兵种 (ID)
+  unlock_evolution_troop_id INT DEFAULT NULL,  -- 通关解锁某兵种进化 (ID) - 简化逻辑：通关解锁该兵种的“下一阶”权限，具体在 user_troop_progress 标记
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (civ, stage_no)
+) ENGINE=InnoDB;
+
+-- 5. 兵种解锁与进化进度表 (新加)
+CREATE TABLE IF NOT EXISTS user_troop_progress (
+  user_id BIGINT NOT NULL,
+  troop_id INT NOT NULL,
+  
+  status INT NOT NULL DEFAULT 0, -- 0=LOCKED, 1=DISCOVERED(发现/可解锁), 2=UNLOCKED(已解锁/可招募)
+  evolution_tier INT NOT NULL DEFAULT 0, -- 0=初始, 1=一阶...
+  
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (user_id, troop_id)
+) ENGINE=InnoDB;
+
+-- 6. 兵种进化配置表 (新加)
+CREATE TABLE IF NOT EXISTS troop_evolution_config (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  troop_id INT NOT NULL,
+  next_tier INT NOT NULL,
+  
+  required_civ VARCHAR(10) DEFAULT NULL,
+  required_stage_no INT DEFAULT NULL,
+  
+  cost_gold BIGINT NOT NULL DEFAULT 0,
+  cost_items_json JSON DEFAULT NULL,
+  
+  stat_modifiers_json JSON NOT NULL, -- {"atk": 10, "spd": 2} ...
+  
+  INDEX idx_tec_troop (troop_id, next_tier)
 ) ENGINE=InnoDB;

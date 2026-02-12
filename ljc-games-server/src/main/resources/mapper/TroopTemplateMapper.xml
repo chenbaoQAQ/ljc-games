@@ -4,4 +4,8 @@
     <select id="selectById" resultType="ljc.entity.TroopTemplateTbl">
         SELECT * FROM troop_template WHERE troop_id = #{troopId}
     </select>
+    
+    <select id="selectAll" resultType="ljc.entity.TroopTemplateTbl">
+        SELECT * FROM troop_template
+    </select>
 </mapper>

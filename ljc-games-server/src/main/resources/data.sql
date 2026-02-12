@@ -16,6 +16,8 @@ DELETE FROM skill_template;
 DELETE FROM personality_config;
 DELETE FROM user_civ_progress;
 DELETE FROM user_troops;
+DELETE FROM user_troop_progress;
+DELETE FROM troop_evolution_config;
 DELETE FROM story_unlock_config;
 DELETE FROM drop_pool;
 
@@ -148,15 +150,19 @@ INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, ene
 
 
 -- CN unlock config
-INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
-('CN', 1, 1002, NULL),
-('CN', 5, 1003, NULL),
-('CN', 10, 1004, 'JP');
+-- CN unlock config
+INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ, unlock_troop_id, unlock_evolution_troop_id) VALUES
+('CN', 1, 1002, NULL, 2001, NULL),  -- 1关解锁步兵
+('CN', 2, NULL, NULL, 2002, NULL),  -- 2关解锁弓兵
+('CN', 3, NULL, NULL, 2003, NULL),  -- 3关解锁骑兵
+('CN', 5, 1003, NULL, 3001, NULL),  -- 5关解锁特种兵(诸葛连弩)
+('CN', 8, NULL, NULL, NULL, 2001),  -- 8关解锁步兵进化
+('CN', 10, 1004, 'JP', NULL, NULL);
 
-INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ) VALUES
-('JP', 1, 2001, NULL),
-('JP', 5, 2002, NULL),
-('JP', 10, 2003, 'KR');
+INSERT INTO story_unlock_config (civ, stage_no, unlock_general_template_id, unlock_next_civ, unlock_troop_id, unlock_evolution_troop_id) VALUES
+('JP', 1, 2001, NULL, 2101, NULL),
+('JP', 5, 2002, NULL, 3002, NULL),
+('JP', 10, 2003, 'KR', NULL, NULL);
 
 
 INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_capacity, speed, personality_code, activate_gold_cost, max_level_tier0, default_skill_id) VALUES
@@ -357,4 +363,14 @@ ON DUPLICATE KEY UPDATE
     enemy_config_json = VALUES(enemy_config_json);
 
 -- 重新启用外键检查
+-- 11. 插入兵种进化配置
+INSERT INTO troop_evolution_config (troop_id, next_tier, required_civ, required_stage_no, cost_gold, stat_modifiers_json) VALUES
+-- CN 步兵进化 -> 精锐步兵
+(2001, 1, 'CN', 8, 2000, '{"atk": 5, "hp": 20}'),
+-- CN 弓兵进化 -> 长弓手
+(2002, 1, 'CN', 9, 2000, '{"atk": 8, "range": 1}'),
+-- CN 骑兵进化 -> 重骑兵
+(2003, 1, 'CN', 10, 3000, '{"atk": 10, "hp": 50}');
+
+
 SET FOREIGN_KEY_CHECKS = 1;
