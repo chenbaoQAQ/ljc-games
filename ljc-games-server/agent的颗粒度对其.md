@@ -1,185 +1,153 @@
-# LJC Games 当前项目报告（面向技术负责人）
+# LJC Games 当前项目报告（技术负责人版，已按代码核对）
 
-## 1. 项目形态与运行方式
-- 前端：`Vite + 原生 JS` 单页应用，路由在 `ljc-game-frontend/src/main.js` 注册。
-- 后端：`Spring Boot + MyBatis + MySQL`，REST API 分模块提供能力。
-- 启动时数据库初始化：`spring.sql.init.mode=always`，自动执行 `schema.sql` 与 `data.sql`。
-- 前端开发端口：`3000`，后端端口：`8080`，前端通过 `/api` 代理到后端。
+> 核对基准：前端 `ljc-game-frontend/src`、后端 `ljc-games-server/src`、初始化脚本 `schema.sql + data.sql`。
 
-## 2. 前端模块（页面、功能、展示效果）
+## 1. 项目结构与运行
+- 前端：Vite + 原生 JS SPA，路由入口 `ljc-game-frontend/src/main.js`。
+- 后端：Spring Boot + MyBatis + MySQL。
+- 数据初始化：`spring.sql.init.mode=always`，启动自动执行 `schema.sql` + `data.sql`。
+- 端口：前端开发 `3000`，后端 `8080`，前端走 `/api` 代理。
 
-### 2.1 登录模块 `/login`
-- 功能：注册/登录。
-- 展示：登录页，登录后写入 `localStorage` 并跳转大厅。
+## 2. 前端模块（当前实际）
 
-### 2.2 大厅模块 `/hall`
-- 功能：
-  - 展示玩家昵称、金币、钻石。
-  - 展示武将缩略卡。
-  - 展示兵力卡（步/弓/骑）。
-  - 展示国家进度与功能入口。
-- 展示效果：
-  - 兵力显示按当前国家（`initialCiv`）的三基础兵种，不再汇总全国家兵力。
-  - 卡片化布局，按钮跳转到武将、招兵、关卡、装备、宝石、技能等模块。
+### 2.1 登录 `/login`
+- 注册/登录，登录后写入 `localStorage`，进入大厅。
 
-### 2.3 招兵模块 `/recruit`
-- 功能：
-  - 按国家解锁状态展示可招募兵种。
-  - 支持基础兵和特种兵招募，数量步进调整。
-  - 调用 `/hall/recruit` 招募并刷新金币/库存。
-- 展示效果：
-  - 列表卡片展示兵种图标、名称、当前拥有、招募单价。
-  - 使用统一配置元数据文件 `src/config/gameData.js`。
+### 2.2 大厅 `/hall`
+- 展示玩家资源、武将摘要、国家进度、功能入口。
+- 兵力区已改为动态网格：
+  - 支持多兵种滚动展示（非固定3卡）。
+  - 按当前国家过滤显示。
+  - 展示特种标记。
+- 功能按钮：武将、招募、关卡、装备、宝石、技能、图鉴、爬塔入口（爬塔仍为占位提示）。
 
-### 2.4 武将管理模块 `/generals`
-- 功能：
-  - 展示武将列表与详情。
-  - 激活、升级、升阶。
-  - 装备槽点击穿戴，调起装备选择弹窗。
-- 展示效果：
-  - 武将面板显示：HP、攻击、速度、统率、技能信息。
-  - 6槽位（武器/防具/头盔/鞋子/坐骑/饰品）可视化。
-  - 仅展示可用装备（闲置或当前武将已装备）。
+### 2.3 招募 `/recruit`
+- 数据来源：`/player/info` + `/troop/codex`。
+- 已解锁兵种可调数量招募；未解锁兵种灰态并展示 `unlockHint`。
+- 招募调用 `/hall/recruit`。
 
-### 2.5 装备模块 `/equipment`
-- 功能：
-  - 获取装备清单并执行强化。
-  - 展示装备模板名称、槽位、基础属性。
-- 展示效果：
-  - 每件装备显示：名称、强化等级、穿戴状态、基础 ATK/HP/SPD、强化消耗。
+### 2.4 武将 `/generals`
+- 武将列表与详情。
+- 激活、升级、升阶。
+- 6装备栏穿戴管理：武器、防具、头盔、鞋子、坐骑、饰品。
 
-### 2.6 宝石模块 `/gem`
-- 功能：
-  - 宝石 5 合 1。
-  - 选择装备孔位进行宝石镶嵌。
-- 展示效果：
-  - 左侧宝石分组（类型+等级+数量），满足条件可合成。
-  - 右侧装备孔位状态（已镶嵌/空位）和弹窗选宝石流程。
+### 2.5 装备 `/equipment`
+- 展示装备模板名、槽位、基础属性、强化等级、穿戴状态。
+- 支持强化。
 
-### 2.7 技能模块 `/skill`
-- 功能：
-  - 选择武将，选择技能书学习技能（覆盖旧技能）。
-  - 学习后刷新背包数量。
-- 展示效果：
-  - 技能书显示名称映射（301~306）而非纯 ID。
-  - 武将横向选择卡与技能书网格列表。
+### 2.6 宝石 `/gem`
+- 宝石合成（5合1）。
+- 装备孔位镶嵌。
 
-### 2.8 关卡模块 `/stages`
-- 功能：
-  - 展示国家关卡进度。
-  - 进入战前整备页。
-- 展示效果：
-  - 关卡列表按国家进度解锁状态展示。
+### 2.7 技能 `/skill`
+- 选择武将 + 技能书学习技能（覆盖式）。
+- 技能书显示名称映射（前端 `SKILL_BOOK_META` 已扩到 `301~313`）。
 
-### 2.9 战前整备模块 `/battle/prepare`
-- 功能：
-  - 选择主将。
-  - 分配兵力并校验统率占用。
-  - 发起故事战斗 `/battle/story/start`。
-- 展示效果：
-  - 仅显示当前出征国家可用兵种：三基础兵种 + 本国特种兵。
-  - 统率显示为“占用值/上限 + 总兵数”，并实时禁用/启用出征按钮。
-  - 统率占用使用兵种配置 `capCost` 计算。
+### 2.8 关卡 `/stages`
+- 按国家显示主线进度与解锁状态。
+- 进入战前整备。
 
-### 2.10 战斗模块 `/battle`
-- 功能：
-  - 从 `/battle/state` 恢复战斗。
-  - 调用 `/battle/turn` 推进回合。
-  - 按事件流渲染日志、血量、兵堆栈变化。
-- 展示效果：
-  - 顶部显示回合与阶段（武将单挑/全军出击）。
-  - 阶段 2 技能按钮禁用。
-  - 支持展示 `PHASE_CHANGE`、`TROOP_ATTACK` roll 分流等日志。
+### 2.9 战前整备 `/battle/prepare`
+- 选择主将，分配兵力。
+- 统率占用实时校验，超限禁用出征。
+- 可见兵种按国家过滤（含本国特种兵）。
 
-## 3. 后端模块（控制器、服务、当前能力）
+### 2.10 战斗 `/battle`
+- 状态恢复：`/battle/state`。
+- 推进回合：`/battle/turn`。
+- 前端按事件流展示日志与状态。
 
-### 3.1 认证与玩家信息
-- `AuthController`：`/auth/register`、`/auth/login`。
-- `PlayerController`：
-  - `/player/info`：玩家基础信息 + 兵力列表 + 当前国家 `initialCiv`。
-  - `/player/progress`：四国进度。
-- 对应服务：`AuthService`、`PlayerInfoService`、`PlayerInitService`。
+### 2.11 图鉴 `/codex`
+- 全兵种列表 + 国家筛选。
+- 展示解锁状态、基础属性、解锁提示。
+- 进化按钮受 `evolutionUnlocked` 控制，未解锁时禁用。
 
-### 3.2 大厅系统
-- `HallController`：
-  - 武将：激活/升级/升阶/查询。
-  - 装备：穿戴、强化、查询。
-  - 宝石：镶嵌、合成、查询。
-  - 技能：学习、道具查询。
-  - 招募：兵力招募。
-- 对应服务：`HallService`（核心业务聚合）。
-- 当前输出：
-  - `UserGeneralVO` 包含 `name/atk/speed/capacity/skill` 等展示字段。
-  - `UserEquipmentVO` 包含模板名、槽位、基础属性（含 `baseSpd`）。
+## 3. 后端模块与接口（当前实际）
 
-### 3.3 战斗系统
-- `BattleController`：
-  - `/battle/state`：读取战斗状态。
-  - `/battle/story/start`：开始主线战斗。
-  - `/battle/turn`：推进战斗回合（含幂等 `clientTurnNo`）。
-- 对应服务：`BattleService`，核心引擎在 `battle/core/BattleEngine`。
-- 当前战斗流程：
-  - 两阶段：`HERO_SOLO` -> `TROOP_WAR`。
-  - 阶段切换基于战斗状态判定并发 `PHASE_CHANGE` 事件。
-  - 兵种攻击采用 roll 分流：伤害拆分到敌方武将/兵线。
-  - 一方无可战单位则结束并发 `BATTLE_END`。
+### 3.1 认证与玩家
+- `AuthController`
+  - `POST /auth/register`
+  - `POST /auth/login`
+- `PlayerController`
+  - `GET /player/info`（含资源、兵力、`initialCiv`）
+  - `GET /player/progress`
 
-### 3.4 特种兵机制（已接入引擎）
-- `3001`：治疗型，行动时治疗己方英雄并恢复兵线前排。
-- `3002`：AOE 分散型，对敌方兵堆栈均摊兵线伤害。
-- `3003`：英雄增益型，提升己方英雄攻击倍率（持续回合）。
-- `3004`：敌军减攻型，降低敌方小兵攻击倍率（持续回合）。
+### 3.2 大厅聚合
+- `HallController` 主要能力：
+  - 武将：查询/激活/升级/升阶
+  - 装备：查询/穿戴/强化
+  - 宝石：查询/镶嵌/合成
+  - 技能：学习/道具查询
+  - 招募：`POST /hall/recruit`
+- `HallService.recruit` 已做兵种解锁校验（未解锁会拦截）。
 
-### 3.5 配置与关卡
-- `StageController`：关卡配置读取（`/stage/story/{civ}/{stageNo}`）。
-- `ConfigController`：技能配置读取（`/config/skills`）。
-- `TroopController`：兵营招募接口（保留）。
-- 对应服务：`StageService`、`TroopService`。
+### 3.3 战斗
+- `BattleController`
+  - `POST /battle/story/start`
+  - `POST /battle/turn`
+  - `GET /battle/state`
+- `BattleService` + `BattleEngine`
+  - 当前战斗分两阶段：`HERO_SOLO -> TROOP_WAR`。
+  - 战斗胜利后 `handleVictoryRewards` 会读取 `story_unlock_config` 并触发：
+    - 武将解锁
+    - 国家解锁
+    - 兵种解锁（`unlock_troop_id`）
+    - 进化权限解锁（`unlock_evolution_troop_id`）
 
-## 4. 数据与数值现状
-- 数据源：`schema.sql` + `data.sql` 启动自动执行。
-- 目前 `data.sql` 已包含：
-  - 四国基础模板（武将、兵种、装备、宝石、技能映射）。
-  - 故事关卡配置（含 CN 关卡重填）。
-  - 测试账号、初始资产、技能书、兵力库存。
-  - 特种兵与技能书映射、初始可测数据。
-- 当前统率体系：
-  - 前端整备按 `capCost` 计算占用。
-  - 后端兵种模板 `cost` 与前端口径已同步调整。
+### 3.4 兵种/图鉴/进化
+- `TroopController`
+  - `POST /troop/recruit`
+  - `GET /troop/codex`
+  - `GET /troop/progression`
+  - `POST /troop/evolve`
+- `TroopService` 当前行为：
+  - `recruit`：已做解锁校验（与 Hall 侧一致）。
+  - `unlockTroop`：写入/提升 `status=UNLOCKED`。
+  - `unlockEvolution`：写入 `evolution_unlocked=1`。
+  - `evolveTroop`：校验解锁状态 + 进化权限 + 关卡前置 + 金币消耗。
+  - `getTroopCodex`：返回 `status`、`evolutionTier`、`evolutionUnlocked`、`unlockCiv`、`unlockStageNo`、`unlockHint`。
 
-## 5. 当前可直接联调的主流程
-- 注册/登录 -> 大厅。
-- 武将激活/升级/升阶 -> 装备强化 -> 宝石镶嵌/合成 -> 学技能。
-- 招兵 -> 战前整备（统率校验）-> 开战 -> 回合推进 -> 结算返回。
-- 国家关卡推进与解锁流程可走通。
+## 4. 数据层现状（Schema + Seed）
 
-## 6. 本阶段验收结论（项目经理复验）
-- 结论：本阶段按“有条件通过”收口，核心目标已可用，保留环境层风险。
-- 复验范围：兵种解锁、进化解锁、图鉴解锁提示、招募绕过阻断、数据初始化稳定性。
+### 4.1 关键表
+- 资产：`user_generals`、`user_troops`、`user_equipments`、`user_gems`、`user_inventory`。
+- 配置：`general_template`、`troop_template`、`equipment_template`、`gem_template`、`skill_template`、`skill_book_map`。
+- 进度：`user_civ_progress`、`story_unlock_config`、`user_troop_progress`、`troop_evolution_config`。
+- 战斗：`battle_sessions`、`battle_log`、`battle_turn_log`。
 
-### 6.1 已落地能力
-- 招募双入口一致校验：
-  - `/hall/recruit` 与 `/troop/recruit` 均要求 `user_troop_progress.status=2` 才可招募。
-  - 未解锁统一报错：`兵种未解锁，无法招募`。
-- 进化权限独立控制：
-  - `user_troop_progress` 新增 `evolution_unlocked`。
-  - `unlockEvolution` 事件落库后，`/troop/evolve` 才允许执行。
-- 图鉴解锁提示可下发：
-  - `TroopCodexVO` 包含 `unlockCiv`、`unlockStageNo`、`unlockHint`、`evolutionUnlocked`。
-  - 前端招募与图鉴页可直接展示“通关 X 国第 Y 关解锁”。
-- 四国特种兵解锁配置补齐：
-  - KR 第 5 关解锁 `3003`。
-  - GB 第 5 关解锁 `3004`。
+### 4.2 装备/宝石/技能书
+- 装备模板已覆盖6栏：`weapon/armor1/helm/boots/mount/accessory`，并补了多件测试装。
+- 宝石模板已包含：`ATK/HP/SPD/CAP`，等级 `1~5`。
+- 技能模板已扩展到 `1~13`（主动+被动初版）。
+- 技能书映射已扩展到 `301~313`，并给测试号发放对应数量。
 
-### 6.2 修复过的阻断项
-- 修复 `UserTroopProgressMapper.xml` 的 SQL 语法问题（双 `WHERE`）。
-- 修复 `data.sql` 的 `story_unlock_config` 主键冲突（移除重复块）。
-- 清理 `TroopService` 冗余重复逻辑（重复校验/重复赋值）。
+### 4.3 兵种精细化
+- 已补“兵种精细化补丁V2”：四国三基础兵差异化定位，四特种兵参数重设。
+- 前端 `gameData.js` 已同步名称、招募价、统率占用，显示口径与后端一致。
 
-### 6.3 当前残余风险
-- 本机环境缺少 Maven（`mvn`），本轮以静态核验为主，未执行编译级验收。
-- 建议在具备 Maven 的环境补跑一次后端构建与接口回归。
+## 5. 测试账号态（admin）
+- 账号：`admin`（用户ID=1，初始化脚本写入）。
+- 当前设置为全模块联调态：
+  - 四国进度全开（10关）。
+  - 全兵种库存。
+  - `user_troop_progress` 全解锁 + 进化权限开启。
+  - 全武将已解锁（脚本按 `general_template` 自动补齐）。
+  - 爬塔进度已置为可测状态。
 
-### 6.4 测试责任划分
-- 代码与文档收口：已完成。
-- 业务联调与实机流程测试：由项目侧继续执行（你这边自行测试）。
+## 6. 当前可走通流程
+1. 登录 -> 大厅。
+2. 武将管理（激活/升级/升阶/穿戴）。
+3. 装备强化 + 宝石镶嵌/合成 + 技能学习。
+4. 招募（按解锁状态控制）-> 战前整备 -> 开战 -> 推回合 -> 结算。
+5. 图鉴查看解锁条件并触发进化。
+
+## 7. 已知风险与技术债（真实保留项）
+- 数据脚本存在“前段插入 + 后段覆盖（ON DUPLICATE/UPDATE）”的模式：
+  - 最终落库以脚本后段为准；可用但维护成本高。
+- 爬塔页面前端仍是入口占位，未形成完整玩法闭环。
+- 本机环境未装 Maven（`mvn` 不可用），本报告基于代码与脚本静态核对；后端构建级验证需在有 Maven 的环境执行。
+
+## 8. 建议的下一步治理
+1. 把 `data.sql` 拆分为“基础种子 + 平衡补丁 + 测试态覆盖”三层文件，减少覆盖冲突。
+2. 收敛 `TroopService.recruit` 与 `HallService.recruit` 到单一服务入口，避免双处逻辑漂移。
+3. 把技能 `effect_json` 逐步接入战斗引擎真实结算，减少“配置已写但战斗未生效”的落差。

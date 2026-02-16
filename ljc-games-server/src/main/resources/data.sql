@@ -72,17 +72,43 @@ INSERT INTO general_template (template_id, civ, name, base_atk, base_hp, base_ca
     (1004, 'CN', '无双战将', 100, 1000, 8, 80, 'BERSERKER', 0, 10, 1);
 
 
--- 5. 插入装备模板
+-- 5. 插入装备模板（6栏：weapon/armor1/helm/boots/mount/accessory）
 INSERT INTO equipment_template (template_id, slot, name, base_atk, base_hp, base_spd, base_capacity, enhance_growth_json) VALUES
     (1, 'weapon', '铁剑', 10, 0, 0, 0, '{"atk": 5}'),
     (2, 'armor1', '皮甲', 0, 50, 0, 0, '{"hp": 20}'),
     (3, 'helm', '轻钢盔', 0, 30, 4, 0, '{"hp": 10, "spd": 1}'),
-    (4, 'boots', '疾风靴', 0, 0, 8, 0, '{"spd": 2}');
+    (4, 'boots', '疾风靴', 0, 0, 8, 0, '{"spd": 2}'),
+    (5, 'mount', '战马', 6, 20, 12, 1, '{"atk": 2, "hp": 8, "spd": 3, "cap": 1}'),
+    (6, 'accessory', '虎符', 8, 10, 0, 2, '{"atk": 3, "hp": 5, "cap": 1}'),
+    (7, 'weapon', '青锋剑', 20, 0, 0, 0, '{"atk": 7}'),
+    (8, 'armor1', '锁子甲', 0, 90, 0, 0, '{"hp": 28}'),
+    (9, 'helm', '玄铁盔', 0, 55, 6, 0, '{"hp": 16, "spd": 1}'),
+    (10, 'boots', '追风靴', 0, 0, 14, 0, '{"spd": 3}'),
+    (11, 'mount', '赤兔', 10, 30, 18, 1, '{"atk": 3, "hp": 10, "spd": 4, "cap": 1}'),
+    (12, 'accessory', '龙纹佩', 12, 20, 2, 3, '{"atk": 4, "hp": 8, "spd": 1, "cap": 1}');
 
 -- 6. 插入宝石模板
 INSERT INTO gem_template (gem_type, gem_level, stat_value) VALUES
     ('ATK', 1, 10),
-    ('HP', 1, 100);
+    ('ATK', 2, 24),
+    ('ATK', 3, 42),
+    ('ATK', 4, 68),
+    ('ATK', 5, 102),
+    ('HP', 1, 100),
+    ('HP', 2, 240),
+    ('HP', 3, 420),
+    ('HP', 4, 680),
+    ('HP', 5, 1020),
+    ('SPD', 1, 2),
+    ('SPD', 2, 5),
+    ('SPD', 3, 9),
+    ('SPD', 4, 14),
+    ('SPD', 5, 20),
+    ('CAP', 1, 1),
+    ('CAP', 2, 2),
+    ('CAP', 3, 3),
+    ('CAP', 4, 4),
+    ('CAP', 5, 5);
 
 -- 7. 插入测试用户 (admin)
 -- 密码 hash 暂为 dummy，实际应由 AuthService 加密。这里假设 Auth 逻辑允许明文或已有 hash
@@ -101,7 +127,13 @@ INSERT INTO user_equipments (user_id, template_id, enhance_level, general_id, sl
     (1, 1, 0, NULL, NULL, 0), -- 铁剑
     (1, 2, 0, NULL, NULL, 0), -- 皮甲
     (1, 3, 0, NULL, NULL, 0), -- 轻钢盔
-    (1, 4, 0, NULL, NULL, 0); -- 疾风靴
+    (1, 4, 0, NULL, NULL, 0), -- 疾风靴
+    (1, 5, 0, NULL, NULL, 0), -- 战马
+    (1, 6, 0, NULL, NULL, 0), -- 虎符
+    (1, 7, 0, NULL, NULL, 0), -- 青锋剑
+    (1, 8, 0, NULL, NULL, 0), -- 锁子甲
+    (1, 11, 0, NULL, NULL, 0), -- 赤兔
+    (1, 12, 0, NULL, NULL, 0); -- 龙纹佩
 
 -- 8.3 初始宝石
 INSERT INTO user_gems (user_id, gem_type, gem_level, stat_value, is_used) VALUES
@@ -109,7 +141,16 @@ INSERT INTO user_gems (user_id, gem_type, gem_level, stat_value, is_used) VALUES
     (1, 'ATK', 1, 10, 0),
     (1, 'ATK', 1, 10, 0),
     (1, 'ATK', 1, 10, 0),
-    (1, 'ATK', 1, 10, 0);
+    (1, 'ATK', 1, 10, 0),
+    (1, 'HP', 1, 100, 0),
+    (1, 'HP', 1, 100, 0),
+    (1, 'HP', 1, 100, 0),
+    (1, 'SPD', 1, 2, 0),
+    (1, 'SPD', 1, 2, 0),
+    (1, 'CAP', 1, 1, 0),
+    (1, 'CAP', 1, 1, 0),
+    (1, 'ATK', 2, 24, 0),
+    (1, 'HP', 2, 240, 0);
 
 -- 8.4 初始道具 (技能书: ItemId=301 -> SkillId=1)
 -- 需先配置 skill_book_map
@@ -120,10 +161,10 @@ INSERT INTO user_inventory (user_id, item_id, count) VALUES
 
 -- 8.5 初始化四国进度 (CN已解锁,其他未解锁)
 INSERT INTO user_civ_progress (user_id, civ, unlocked, max_stage_cleared) VALUES
-(1, 'CN', 1, 0),
-(1, 'JP', 0, 0),
-(1, 'KR', 0, 0),
-(1, 'GB', 0, 0);
+(1, 'CN', 1, 10),
+(1, 'JP', 1, 10),
+(1, 'KR', 1, 10),
+(1, 'GB', 1, 10);
 
 -- 8.6 初始兵力 (四国全兵种，方便测试)
 INSERT INTO user_troops (user_id, troop_id, count) VALUES
@@ -234,11 +275,18 @@ INSERT INTO story_stage_config (civ, stage_no, stage_type, wall_cost_troops, ene
 -- 2) 特种兵 4 个定位先落在模板与命名层；具体“治疗/AOE/Buff/减攻”效果由战斗逻辑实现。
 INSERT INTO skill_template (skill_id, name, description, skill_type, cooldown_turns, trigger_timing, effect_json) VALUES
     (1, '鼓舞', '奶自己（一大口+持续回血）', 'ACTIVE', 3, 'NONE', '{"kind":"heal_self_hot","instant":240,"hotTurns":2,"hotPerTurn":80}'),
-    (2, '乱舞', '攻击敌方武将并溅射敌方三兵种', 'ACTIVE', 3, 'NONE', '{"kind":"hero_splash_troops","heroRatio":1.0,"troopRatio":0.55}'),
+    (2, '战地医治', '治疗我方三个基础兵种', 'ACTIVE', 3, 'NONE', '{"kind":"heal_three_basic_troops","healPerTroop":180}'),
     (3, '毒箭', '对敌方武将造成伤害并附加中毒', 'ACTIVE', 3, 'NONE', '{"kind":"hero_poison","poisonTurns":2,"poisonPerTurn":70}'),
     (4, '威压', '对敌方武将造成伤害并概率眩晕1回合', 'ACTIVE', 3, 'NONE', '{"kind":"hero_stun","chance":0.5,"stunTurns":1}'),
     (5, '铁壁', '给全队套1回合护盾/免疫效果', 'ACTIVE', 4, 'NONE', '{"kind":"team_immune","turns":1}'),
-    (6, '伏兵', '武将对决阶段触发弓手额外齐射', 'ACTIVE', 4, 'NONE', '{"kind":"ambush_archer_volley","ratio":0.7}')
+    (6, '一石二鸟', '攻击敌方武将并溅射敌方三个基础兵种', 'ACTIVE', 3, 'NONE', '{"kind":"hero_splash_troops","heroRatio":1.0,"troopRatio":0.55}'),
+    (7, '偷袭', '武将对决阶段我方弓兵额外齐射敌将一轮', 'ACTIVE', 4, 'NONE', '{"kind":"ambush_archer_volley","ratio":0.7}'),
+    (8, '红颜克制', '对异性造成伤害增加', 'PASSIVE', 0, 'ON_HIT', '{"kind":"bonus_vs_opposite_gender","bonusPermille":250}'),
+    (9, '铁躯', '伤害减少并提高最大生命', 'PASSIVE', 0, 'BATTLE_START', '{"kind":"reduce_damage_and_boost_hp","damageReducePermille":120,"hpBonusPermille":180}'),
+    (10, '易伤掌控', '提高易伤叠加效率并造成更多伤害', 'PASSIVE', 0, 'ON_HIT', '{"kind":"vuln_and_damage_bonus","bonusPermille":150,"vulnExtraPermille":120}'),
+    (11, '反震', '反弹敌方英雄造成伤害的百分比', 'PASSIVE', 0, 'ON_TAKEN_HIT', '{"kind":"reflect_hero_damage","reflectPermille":180}'),
+    (12, '先机', '第一回合必定先出手', 'PASSIVE', 0, 'BATTLE_START', '{"kind":"guaranteed_first_action_round1"}'),
+    (13, '避锋', '第二阶段更低概率成为攻击目标', 'PASSIVE', 0, 'PHASE_CHANGE', '{"kind":"lower_target_rate_phase2","avoidTargetPermille":220}')
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     description = VALUES(description),
@@ -253,7 +301,14 @@ INSERT INTO skill_book_map (item_id, skill_id) VALUES
     (303, 3),
     (304, 4),
     (305, 5),
-    (306, 6)
+    (306, 6),
+    (307, 7),
+    (308, 8),
+    (309, 9),
+    (310, 10),
+    (311, 11),
+    (312, 12),
+    (313, 13)
 ON DUPLICATE KEY UPDATE
     skill_id = VALUES(skill_id);
 
@@ -263,7 +318,14 @@ INSERT INTO user_inventory (user_id, item_id, count) VALUES
     (1, 303, 6),
     (1, 304, 6),
     (1, 305, 6),
-    (1, 306, 6)
+    (1, 306, 6),
+    (1, 307, 4),
+    (1, 308, 4),
+    (1, 309, 4),
+    (1, 310, 4),
+    (1, 311, 4),
+    (1, 312, 4),
+    (1, 313, 4)
 ON DUPLICATE KEY UPDATE
     count = VALUES(count);
 
@@ -296,13 +358,75 @@ ON DUPLICATE KEY UPDATE
     max_level_tier0 = VALUES(max_level_tier0),
     default_skill_id = VALUES(default_skill_id);
 
+-- 兵种精细化补丁V2（四国差异化定位）
+-- 统一口径：INF/ARC 统率2，CAV/ELITE 统率3（下方会再统一覆盖一次）
+INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, base_atk, base_hp, recruit_gold_cost, unlock_civ_required) VALUES
+    -- CN：稳健（防守型）
+    (2001, 'CN', '重盾步兵', 'INF', 0, 2, 18, 78, 22, 0),
+    (2002, 'CN', '强弩兵', 'ARC', 0, 2, 24, 52, 24, 0),
+    (2003, 'CN', '虎豹骑', 'CAV', 0, 3, 34, 94, 42, 0),
+    -- JP：高爆发（进攻型）
+    (2101, 'JP', '足轻', 'INF', 0, 2, 20, 70, 22, 0),
+    (2102, 'JP', '弓足轻', 'ARC', 0, 2, 29, 46, 26, 0),
+    (2103, 'JP', '骑马武者', 'CAV', 0, 3, 36, 86, 45, 0),
+    -- KR：均衡控场（功能型）
+    (2201, 'KR', '步卒', 'INF', 0, 2, 19, 82, 23, 0),
+    (2202, 'KR', '长弓手', 'ARC', 0, 2, 25, 54, 25, 0),
+    (2203, 'KR', '重骑卒', 'CAV', 0, 3, 33, 90, 44, 0),
+    -- GB：压制（肉盾+破甲）
+    (2301, 'GB', '长枪步兵', 'INF', 0, 2, 18, 88, 24, 0),
+    (2302, 'GB', '长弓手', 'ARC', 0, 2, 28, 50, 28, 0),
+    (2303, 'GB', '重骑士', 'CAV', 0, 3, 31, 96, 46, 0),
+    -- Elite：治疗 / AOE分流 / 英雄Buff / 敌军减攻
+    (3001, 'CN', '青囊医官', 'ARC', 1, 3, 31, 96, 130, 1),
+    (3002, 'JP', '爆裂火筒队', 'ARC', 1, 3, 48, 66, 145, 1),
+    (3003, 'KR', '军乐旗卫', 'INF', 1, 3, 34, 124, 140, 1),
+    (3004, 'GB', '破甲工兵', 'INF', 1, 3, 39, 132, 150, 1)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    troop_type = VALUES(troop_type),
+    is_elite = VALUES(is_elite),
+    cost = VALUES(cost),
+    base_atk = VALUES(base_atk),
+    base_hp = VALUES(base_hp),
+    recruit_gold_cost = VALUES(recruit_gold_cost),
+    unlock_civ_required = VALUES(unlock_civ_required);
+
+-- admin 全武将解锁（避免只测到前两名武将）
+INSERT INTO user_generals (user_id, template_id, unlocked, activated, level, current_hp, max_hp, capacity, rest_turns, tier)
+SELECT
+    1,
+    gt.template_id,
+    1,
+    1,
+    1,
+    gt.base_hp,
+    gt.base_hp,
+    gt.base_capacity,
+    0,
+    0
+FROM general_template gt
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM user_generals ug
+    WHERE ug.user_id = 1
+      AND ug.template_id = gt.template_id
+);
+
+INSERT INTO user_tower_progress (user_id, unlocked, max_floor_cleared, season)
+VALUES (1, 1, 10, 1)
+ON DUPLICATE KEY UPDATE
+    unlocked = VALUES(unlocked),
+    max_floor_cleared = VALUES(max_floor_cleared),
+    season = VALUES(season);
+
 INSERT INTO troop_template (troop_id, civ, name, troop_type, is_elite, cost, base_atk, base_hp, recruit_gold_cost, unlock_civ_required) VALUES
     -- 特种兵定位：
     -- 3001 治疗、3002 AOE分流、3003 英雄Buff、3004 敌军减攻（当前版本先体现在定位与数值）
-    (3001, 'CN', '青囊医官', 'ARC', 1, 3, 30, 82, 120, 1),
-    (3002, 'JP', '爆裂火筒队', 'ARC', 1, 3, 44, 68, 130, 1),
-    (3003, 'KR', '军乐旗卫', 'INF', 1, 3, 36, 108, 130, 1),
-    (3004, 'GB', '破甲工兵', 'INF', 1, 3, 38, 116, 140, 1)
+    (3001, 'CN', '青囊医官', 'ARC', 1, 3, 31, 96, 130, 1),
+    (3002, 'JP', '爆裂火筒队', 'ARC', 1, 3, 48, 66, 145, 1),
+    (3003, 'KR', '军乐旗卫', 'INF', 1, 3, 34, 124, 140, 1),
+    (3004, 'GB', '破甲工兵', 'INF', 1, 3, 39, 132, 150, 1)
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     troop_type = VALUES(troop_type),
@@ -314,22 +438,26 @@ ON DUPLICATE KEY UPDATE
     unlock_civ_required = VALUES(unlock_civ_required);
 
 INSERT INTO user_troops (user_id, troop_id, count) VALUES
-    -- 只给当前国家(CN)可用兵力，其他国家初始为0，避免前端/玩法混乱
-    (1, 2001, 600),
-    (1, 2002, 500),
-    (1, 2003, 300),
-    (1, 3001, 120),
-    (1, 2101, 0), (1, 2102, 0), (1, 2103, 0), (1, 3002, 0),
-    (1, 2201, 0), (1, 2202, 0), (1, 2203, 0), (1, 3003, 0),
-    (1, 2301, 0), (1, 2302, 0), (1, 2303, 0), (1, 3004, 0)
+    -- admin 全解锁测试态：全部兵种给足兵力，便于全模块联调
+    (1, 1001, 999),
+    (1, 2001, 999), (1, 2002, 999), (1, 2003, 999), (1, 3001, 300),
+    (1, 2101, 999), (1, 2102, 999), (1, 2103, 999), (1, 3002, 300),
+    (1, 2201, 999), (1, 2202, 999), (1, 2203, 999), (1, 3003, 300),
+    (1, 2301, 999), (1, 2302, 999), (1, 2303, 999), (1, 3004, 300)
 ON DUPLICATE KEY UPDATE
     count = VALUES(count);
 
--- 8.7 初始解锁兵种 (否则新建号无法出战)
--- 至少解锁 2001 (步兵)，确保能打第1关
+-- 8.7 admin 全解锁兵种 + 开放进化权限
 INSERT INTO user_troop_progress (user_id, troop_id, status, evolution_tier, evolution_unlocked) VALUES
-(1, 2001, 2, 0, 0)
-ON DUPLICATE KEY UPDATE status = VALUES(status);
+    (1, 1001, 2, 0, 1),
+    (1, 2001, 2, 0, 1), (1, 2002, 2, 0, 1), (1, 2003, 2, 0, 1), (1, 3001, 2, 0, 1),
+    (1, 2101, 2, 0, 1), (1, 2102, 2, 0, 1), (1, 2103, 2, 0, 1), (1, 3002, 2, 0, 1),
+    (1, 2201, 2, 0, 1), (1, 2202, 2, 0, 1), (1, 2203, 2, 0, 1), (1, 3003, 2, 0, 1),
+    (1, 2301, 2, 0, 1), (1, 2302, 2, 0, 1), (1, 2303, 2, 0, 1), (1, 3004, 2, 0, 1)
+ON DUPLICATE KEY UPDATE
+    status = VALUES(status),
+    evolution_tier = VALUES(evolution_tier),
+    evolution_unlocked = VALUES(evolution_unlocked);
 
 -- 同步我方初始武将实例数值（与模板对齐，便于直接测试）
 UPDATE user_generals
