@@ -12,5 +12,11 @@ public class EquipmentTemplateTbl {
     private Long baseHp;
     private Long baseSpd;
     private Integer baseCapacity;
+    // Accessory aura fields (for troop-wide buffs in battle)
+    private String auraScopeType;
+    private String auraScopeValue;
+    private String auraStat;
+    private Integer auraBaseValue;
+    private Integer auraGrowthPerEnhance;
     private LocalDateTime createdAt;
 }

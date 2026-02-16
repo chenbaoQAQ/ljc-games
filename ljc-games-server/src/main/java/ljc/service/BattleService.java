@@ -326,8 +326,41 @@ public class BattleService {
              }
              if (side.troops.stream().allMatch(s -> s.count <= 0)) throw new RuntimeException("Troops died at wall");
         }
+
+        // 4. Accessory aura: troop-wide buff (currently supports troop attack rate only)
+        applyAccessoryAura(side, userId, general.getId());
         
         return side;
+    }
+
+    private void applyAccessoryAura(BattleState.Side side, Long userId, Long generalId) {
+        List<UserEquipmentTbl> equips = userEquipmentMapper.selectByUserId(userId);
+        if (equips == null || equips.isEmpty()) return;
+
+        int troopAtkAuraPermille = 0;
+        for (UserEquipmentTbl equip : equips) {
+            if (equip == null) continue;
+            if (equip.getGeneralId() == null || !equip.getGeneralId().equals(generalId)) continue;
+            if (!"accessory".equalsIgnoreCase(equip.getSlot())) continue;
+
+            EquipmentTemplateTbl tpl = equipmentTemplateMapper.selectById(equip.getTemplateId());
+            if (tpl == null) continue;
+            if (!"TROOP".equalsIgnoreCase(tpl.getAuraScopeType())) continue;
+
+            String auraStat = tpl.getAuraStat();
+            int base = tpl.getAuraBaseValue() == null ? 0 : tpl.getAuraBaseValue();
+            int growth = tpl.getAuraGrowthPerEnhance() == null ? 0 : tpl.getAuraGrowthPerEnhance();
+            int value = base + growth * (equip.getEnhanceLevel() == null ? 0 : equip.getEnhanceLevel());
+            if (value <= 0) continue;
+
+            if ("TROOP_ATK_RATE".equalsIgnoreCase(auraStat) || "ATK_RATE".equalsIgnoreCase(auraStat)) {
+                troopAtkAuraPermille += value;
+            }
+        }
+
+        if (troopAtkAuraPermille > 0) {
+            side.troopAtkRatePermille = Math.min(2000, side.troopAtkRatePermille + troopAtkAuraPermille);
+        }
     }
     
     private BattleState.Side prepareEnemySide(StoryStageConfigTbl config) {

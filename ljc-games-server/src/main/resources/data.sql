@@ -87,6 +87,25 @@ INSERT INTO equipment_template (template_id, slot, name, base_atk, base_hp, base
     (11, 'mount', '赤兔', 10, 30, 18, 1, '{"atk": 3, "hp": 10, "spd": 4, "cap": 1}'),
     (12, 'accessory', '龙纹佩', 12, 20, 2, 3, '{"atk": 4, "hp": 8, "spd": 1, "cap": 1}');
 
+-- 饰品光环：给兵种加成（Aura）
+UPDATE equipment_template
+SET
+  aura_scope_type = 'TROOP',
+  aura_scope_value = 'ALL',
+  aura_stat = 'TROOP_ATK_RATE',
+  aura_base_value = 100,
+  aura_growth_per_enhance = 20
+WHERE template_id = 6;
+
+UPDATE equipment_template
+SET
+  aura_scope_type = 'TROOP',
+  aura_scope_value = 'ALL',
+  aura_stat = 'TROOP_ATK_RATE',
+  aura_base_value = 150,
+  aura_growth_per_enhance = 30
+WHERE template_id = 12;
+
 -- 6. 插入宝石模板
 INSERT INTO gem_template (gem_type, gem_level, stat_value) VALUES
     ('ATK', 1, 10),
