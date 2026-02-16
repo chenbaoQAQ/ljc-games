@@ -327,7 +327,7 @@ export function HallPage(container) {
         document.getElementById('gold-count').textContent = (result.data.gold || 0).toLocaleString();
         document.getElementById('diamond-count').textContent = (result.data.diamond || 0).toLocaleString();
 
-        renderTroops(result.data.troops || [], result.data.initialCiv || 'CN');
+        renderTroops(result.data.troops || []);
       } else {
         console.warn('加载玩家数据: code不为200', result);
       }
@@ -388,7 +388,7 @@ export function HallPage(container) {
     }
   }
 
-  function renderTroops(troops, civ) {
+  function renderTroops(troops) {
     const grid = document.getElementById('troops-grid');
     if (!grid) return;
 
@@ -406,8 +406,9 @@ export function HallPage(container) {
           isElite: !!meta.isElite,
         };
       })
-      .filter(t => t.civ === civ)
+      .filter(t => t.count > 0)
       .sort((a, b) => {
+        if (a.civ !== b.civ) return String(a.civ).localeCompare(String(b.civ));
         if (a.isElite !== b.isElite) return a.isElite ? 1 : -1;
         const typeOrder = { INF: 1, ARC: 2, CAV: 3 };
         return (typeOrder[a.type] || 9) - (typeOrder[b.type] || 9);
@@ -422,7 +423,7 @@ export function HallPage(container) {
       <div class="troop-item">
         <div class="troop-icon" style="background: ${troop.color};">${troop.icon}</div>
         <div class="troop-info">
-          <span class="troop-name">${troop.name}${troop.isElite ? ' [特种]' : ''}</span>
+          <span class="troop-name">[${troop.civ}] ${troop.name}${troop.isElite ? ' [特种]' : ''}</span>
           <span class="troop-count">${troop.count.toLocaleString()}</span>
         </div>
       </div>
