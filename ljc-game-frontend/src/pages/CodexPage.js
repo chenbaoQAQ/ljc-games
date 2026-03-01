@@ -166,18 +166,9 @@ export function CodexPage(container) {
     }
 
     async function handleEvolve(troopId) {
-        if (!confirm('确定要进化该兵种吗？需要消耗金币并满足关卡条件。')) return;
-
-        try {
-            const res = await troopAPI.evolve(userId, parseInt(troopId));
-            if (res.code === 200) {
-                showToast('进化成功！', 'success');
-                loadData(); // Reload to see updates
-            } else {
-                showToast(res.message || '进化失败', 'error');
-            }
-        } catch (e) {
-            showToast(e.message || '请求失败', 'error');
+        // P1-2: Redirect to new Tree Page
+        if (confirm('进化功能已升级为【兵种进化树】，是否前往查看？')) {
+            router.navigate('/codex/tree');
         }
     }
 

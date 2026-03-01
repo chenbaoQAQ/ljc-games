@@ -11,6 +11,7 @@ export function RecruitPage(container) {
       <nav class="page-nav">
         <button class="btn btn-secondary btn-sm" id="back-btn">← 返回大厅</button>
         <h1 class="page-title">招兵买马</h1>
+        <button class="btn btn-primary btn-sm" id="codex-btn">兵种进化树</button>
         <div class="nav-gold">💰 <span id="gold-display">--</span></div>
       </nav>
 
@@ -163,6 +164,7 @@ export function RecruitPage(container) {
   }
 
   document.getElementById('back-btn').addEventListener('click', () => router.navigate('/hall'));
+  document.getElementById('codex-btn').addEventListener('click', () => router.navigate('/codex/tree'));
 
   function showToast(msg, type = 'success') {
     const toast = document.getElementById('toast');

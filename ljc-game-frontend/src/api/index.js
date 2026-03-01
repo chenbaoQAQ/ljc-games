@@ -188,19 +188,26 @@ export const stageAPI = {
 
 // ============ 兵力 API ============
 // ============ 兵力 API ============
+// ============ 兵力 API ============
 export const troopAPI = {
+    // GET /troop/list?userId=xxx
     getTroops(userId) {
         return API.get('/troop/list', { userId });
     },
-    
+
     // GET /troop/codex?userId=xxx
     getCodex(userId) {
         return API.get('/troop/codex', { userId });
     },
-    
-    // POST /troop/evolve?userId=xxx Body: {troopId}
-    evolve(userId, troopId) {
-        return API.postWithParams('/troop/evolve', { userId }, { troopId });
+
+    // GET /troop/codex/tree?userId=xxx&civ=CIV
+    getTree(userId, civ) {
+        return API.get('/troop/codex/tree', { userId, civ });
+    },
+
+    // POST /troop/evolve?userId=xxx Body: {fromNodeId, toNodeId}
+    evolveNode(userId, body) {
+        return API.postWithParams('/troop/evolve', { userId }, body);
     },
 };
 

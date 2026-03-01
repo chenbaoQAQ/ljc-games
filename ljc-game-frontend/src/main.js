@@ -10,6 +10,7 @@ import { SkillPage } from './pages/SkillPage.js';
 import { BattlePage } from './pages/BattlePage.js';
 import { BattlePreparePage } from './pages/BattlePreparePage.js';
 import { CodexPage } from './pages/CodexPage.js';
+import { TreeCodexPage } from './pages/TreeCodexPage.js';
 
 // 注册路由
 router.register('/login', LoginPage);
@@ -23,6 +24,7 @@ router.register('/skill', SkillPage);
 router.register('/battle', BattlePage);
 router.register('/battle/prepare', BattlePreparePage);
 router.register('/codex', CodexPage);
+router.register('/codex/tree', TreeCodexPage);
 
 // 初始化应用
 function init() {
