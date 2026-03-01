@@ -1,125 +1,139 @@
-# Agent 阶段性任务（兵种树状图鉴 V1）
+# Agent 阶段性任务（美术资源产出 V1）
 
 ## 目标
-把现有“平铺兵种图鉴”升级为“树状进化图鉴”：
-- 支持基础兵 -> 一阶进化 -> 二阶进化（可分支）
-- 图鉴节点可显示解锁状态、可进化状态、当前阶
-- 明确展示每个节点的前置节点与解锁条件（X国Y关）
+基于提供的概念图风格，产出可直接接入前端的英雄/兵种美术资源（Q版、2D、明亮、粗描边）。
 
-## 一、范围与边界
-- 本期只做“兵种树状图鉴 + 进化链路数据化 + 前后端联通”。
-- 不重写战斗核心公式；仅保证进化层级和状态在图鉴/接口可用。
-- 允许先做单路线+少量分支样例，结构必须支持后续扩展到十几个兵种。
+## 视觉基准（必须遵守）
+- 参考风格：Q版（约2~3头身），偏塔防卡通。
+- 画面特征：高饱和、清晰轮廓、阵营辨识强。
+- 角色朝向：默认正面偏三分之二视角（与当前UI兼容）。
+- 输出背景：透明底（PNG）。
 
-## 二、后端任务
+## 资产范围（本期）
 
-### B1. 新增“兵种进化树配置”表（核心）
-新增表：`troop_tree_node_config`
-建议字段：
-- `node_id` (PK)
-- `troop_id`（该节点对应兵种模板）
-- `civ`
-- `tier`（0/1/2...）
-- `branch_code`（主线/分支A/分支B）
-- `parent_node_id`（根节点可为空）
-- `unlock_civ`
-- `unlock_stage_no`
-- `evolve_cost_gold`
-- `sort_order`
-- `display_name`
-- `description`
+### 1. CN 阵营
+- 英雄：刘备、关羽、张飞、赵云
+- 兵种：重盾步兵、强弩兵、虎豹骑、青囊医官（特种）
 
-要求：
-- 用配置表达树关系，禁止在代码里写死父子关系。
-- 支持一个父节点对应多个子节点（分支进化）。
+### 2. JP 阵营
+- 英雄：织田信长、真田幸村、德川家康
+- 兵种：足轻、弓足轻、骑马武者、爆裂火筒队（特种）
 
-### B2. 扩展玩家进度结构
-沿用 `user_troop_progress`，补齐语义：
-- `status`：LOCKED/DISCOVERED/UNLOCKED
-- `evolution_tier`
-- `evolution_unlocked`
+### 3. KR 阵营
+- 英雄：李舜臣、金庾信、乙支文德
+- 兵种：步卒、长弓手、重骑卒、军乐旗卫（特种）
 
-要求：
-- 进化后正确更新对应兵种节点状态。
-- 若走分支，未选择分支的节点保持未进化状态（可见但未激活）。
+### 4. GB 阵营
+- 英雄：亚瑟、兰斯洛特、莫德雷德
+- 兵种：长枪步兵、长弓手、重骑士、破甲工兵（特种）
 
-### B3. 图鉴树接口
-新增接口：`GET /troop/codex/tree?userId=xxx&civ=CN`
-返回结构必须含：
-- 节点信息：`nodeId/troopId/name/tier/branchCode/parentNodeId`
-- 状态信息：`locked/discovered/unlocked/evolutionUnlocked/currentTier`
-- 条件信息：`unlockCiv/unlockStageNo/unlockHint`
-- 展示信息：`icon/type/isElite/baseAtk/baseHp/cost`
+## 输出规格（严格）
 
-要求：
-- 一次性返回“树 + 玩家状态”，前端无需二次拼树。
-- 排序稳定（按 `tier + sort_order`）。
+### A. 单位头像（用于卡片/图鉴）
+- 尺寸：`256x256`
+- 格式：`PNG`（透明）
+- 命名：`{civ}_{type}_{id}_avatar.png`
+  - 示例：`CN_hero_1001_avatar.png`、`JP_troop_3002_avatar.png`
 
-### B4. 进化接口升级（支持分支）
-接口：`POST /troop/evolve?userId=xxx`
-请求体建议：
-- `fromNodeId`
-- `toNodeId`
+### B. 全身立绘（用于详情弹层）
+- 尺寸：`768x768`
+- 格式：`PNG`（透明）
+- 命名：`{civ}_{type}_{id}_full.png`
 
-校验：
-- `toNode.parentNodeId == fromNodeId`
-- 解锁条件达成
-- 金币足够
-- 分支冲突规则（同 tier 多分支只能选一）
+### C. 阵营总览图（用于对照验收）
+- 每阵营 2 张：英雄合集、兵种合集
+- 尺寸：`2048x1024`
+- 格式：`PNG`
+- 命名：`{civ}_heroes_sheet.png`、`{civ}_troops_sheet.png`
 
-### B5. 初始化数据
-在 `data.sql` 写入：
-- 至少 1 棵完整树样例（建议 CN）
-- 包含：根节点、二级节点、三级节点、至少一个分支
-- 其余国家可先给最小骨架（根 + 1级）
+## 路径规范（必须落仓库）
+- 目标目录：
+  - `/Users/lijunchen/Documents/ljc/ljc-games/ljc-game-frontend/public/assets/art/heroes/`
+  - `/Users/lijunchen/Documents/ljc/ljc-games/ljc-game-frontend/public/assets/art/troops/`
+  - `/Users/lijunchen/Documents/ljc/ljc-games/ljc-game-frontend/public/assets/art/sheets/`
 
-## 三、前端任务
+## 执行步骤
+1. 按阵营分批生成（CN -> JP -> KR -> GB）。
+2. 每批先出“英雄合集+兵种合集”供风格确认。
+3. 风格确认后再导出对应头像与全身立绘。
+4. 落地到指定目录并按命名规则整理。
+5. 更新映射清单（见下方交付要求）。
 
-### F1. 新增树状图鉴页（替换/升级现有 `/codex`）
-页面目标：
-- 横向或纵向树状布局，节点可视化连接线
-- 节点状态：已解锁/可进化/未解锁（灰态+锁）
-- 点击节点看详情（属性、技能说明、解锁条件）
+## 交付要求（给项目经理查收）
+在 `agent任务完成表.md` 新增章节：`美术资源交付 (Art Assets Delivery)`，必须包含：
+- 生成文件总数（头像/全身/合集分别统计）
+- 文件清单（完整相对路径）
+- 每阵营 2 张验收缩略图路径
+- 风格一致性说明（与概念图对齐点）
+- 未完成项（若无写“无”）
 
-### F2. 布局与交互要求
-必须支持：
-- 节点多时可滚动（横向优先）
-- 桌面与移动端均可浏览
-- 当前选中路径高亮
-- 分支节点区分明显（颜色/边框/标签）
+## 验收标准（DoD）
+1. 四阵营全部角色与兵种覆盖，无漏项。
+2. 文件命名、尺寸、透明底、目录路径全部符合规范。
+3. 可直接通过前端静态资源路径访问（不需要二次处理）。
+4. 阵营视觉可区分（颜色、装束、武器特征明显）。
+5. `agent任务完成表.md` 中有完整可核对交付清单。
 
-### F3. 进化交互
-- 对“可进化”节点显示按钮
-- 调用 `POST /troop/evolve`
-- 成功后局部刷新树，不整页重载
+---
 
-### F4. 与招募页联动
-- 招募页使用树状态：
-  - 未解锁节点不可招募
-  - 已解锁节点可招募
-- 解锁提示统一复用 `unlockHint`
+# Agent 阶段性任务（返工：兵种进化树闭环修复）
 
-## 四、验收标准（DoD）
-全部满足才算通过：
-1. `/troop/codex/tree` 返回树结构，不是平铺列表。
-2. 至少一棵兵种树支持“三级 + 分支”。
-3. 图鉴页面可视化展示父子连接关系。
-4. 未解锁节点灰态并显示具体关卡条件。
-5. 进化接口支持分支选择，错误分支会被拦截。
-6. 进化后页面状态实时更新。
-7. 招募页与图鉴状态一致，不可绕过。
+## 目标
+修复树状图鉴当前阻断问题，确保“查看树 -> 进化 -> 分支互斥 -> 招募联动”完整可用。
 
-## 五、交付要求（给项目经理查收）
-提交 `agent任务完成表.md` 时必须包含：
-- 改动文件清单（后端/前端/SQL）
-- 树结构示例截图（至少1张）
-- 核心接口请求/响应样例
-- 分支进化成功与失败用例各1条
-- 已知未完成项（若无写“无”）
+## 必做项（按优先级）
 
-## 六、最小自测清单
-1. 打开图鉴树，能看到节点连接关系。
-2. 锁定节点显示“通关 X 国第 Y 关解锁”。
-3. 满足条件后，节点从锁定变可进化。
-4. 选择分支A进化成功，分支B被标记为未选择分支。
-5. 招募页只允许已解锁节点招募。
+### P0-1 前端请求参数修复
+- 修改 `troopAPI.getTree` 和 `troopAPI.evolveNode`，显式传 `userId`。
+- 要求：
+  - `GET /troop/codex/tree?userId=1&civ=CN`
+  - `POST /troop/evolve?userId=1`
+- 文件：`ljc-game-frontend/src/api/index.js`
+
+### P0-2 分支互斥字段落库修复
+- 在 `UserTroopProgressMapper.xml` 的 `insert/update` 中补齐 `chosen_child_node_id` 读写。
+- 要求：
+  - 进化 A 分支后，父节点 `chosen_child_node_id = A_node_id`
+  - 刷新页面后，兄弟分支保持 `BRANCH_LOCKED`
+- 文件：`ljc-games-server/src/main/resources/mapper/UserTroopProgressMapper.xml`
+
+### P0-3 进化插入空字段修复
+- `TroopTreeService.evolveNode` 新建 `toProgress` 时补齐 `evolutionTier`（至少置 0）和必要字段，避免插入失败。
+- 文件：`ljc-games-server/src/main/java/ljc/service/TroopTreeService.java`
+
+### P1-1 Tree 页面错误提示字段修复
+- `res.msg` 改为 `res.message`（含加载失败与进化失败两处）。
+- 文件：`ljc-game-frontend/src/pages/TreeCodexPage.js`
+
+### P1-2 旧图鉴页兼容处理
+- `CodexPage.js` 当前调用 `troopAPI.evolve` 已失效。
+- 二选一：
+  - A. 恢复 `troopAPI.evolve(userId, troopId)` 兼容旧页；
+  - B. 旧页按钮改为跳转树页并移除旧进化调用。
+- 文件：`ljc-game-frontend/src/pages/CodexPage.js`
+- 文件：`ljc-game-frontend/src/api/index.js`
+
+## 交付物要求
+- 代码变更提交。
+- `agent任务完成表.md` 新增“返工验收结果”章节，必须包含：
+  - 修改文件清单
+  - 每个 P0/P1 的修复说明
+  - 2 组接口样例（成功/失败）
+  - 3 张截图（初始、可进化、分支锁定后）
+
+---
+
+# Agent 阶段性任务（三次返工：Tree 页面编译阻断修复）
+
+## 目标
+修复 `TreeCodexPage.js` 语法错误，恢复页面可编译、可路由进入、可调用树接口。
+
+## 必做项（P0）
+1. 修正 `TreeCodexPage` 类定义，删除重复嵌套 `constructor`，保证类结构合法。
+2. 本地执行语法检查并回填结果到完成表：
+   - `node --check ljc-game-frontend/src/pages/TreeCodexPage.js`
+3. 复查 `onMount/loadTree/handleEvolve` 方法均在类作用域内，且 `this.userId` 初始化一次即可。
+
+## 交付要求
+- 更新 `agent任务完成表.md`：新增“三次返工结果”，贴出语法检查通过结果（文本）。
+- 不需要改需求，只修编译阻断。

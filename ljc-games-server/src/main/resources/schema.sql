@@ -46,6 +46,7 @@ DROP TABLE IF EXISTS personality_config;
 DROP TABLE IF EXISTS story_unlock_config;
 DROP TABLE IF EXISTS user_troop_progress;
 DROP TABLE IF EXISTS troop_evolution_config;
+DROP TABLE IF EXISTS troop_tree_node_config;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -505,4 +506,47 @@ CREATE TABLE IF NOT EXISTS troop_evolution_config (
   stat_modifiers_json JSON NOT NULL, -- {"atk": 10, "spd": 2} ...
   
   INDEX idx_tec_troop (troop_id, next_tier)
+) ENGINE=InnoDB;
+
+-- 7. 兵种树节点配置 (新加 - 树状图鉴核心)
+CREATE TABLE IF NOT EXISTS troop_tree_node_config (
+  node_id BIGINT PRIMARY KEY,
+  troop_id INT NOT NULL,
+  
+  parent_node_id BIGINT DEFAULT NULL, -- NULL为根节点
+  
+  civ VARCHAR(10) NOT NULL,
+  tier INT NOT NULL DEFAULT 0,
+  
+  unlock_civ VARCHAR(10) DEFAULT NULL,    -- 解锁条件：国家
+  unlock_stage_no INT DEFAULT 0,          -- 解锁条件：关卡
+  
+  evolve_cost INT NOT NULL DEFAULT 0,     -- 进化金币消耗
+  
+  x_pos INT DEFAULT 0, -- 前端可视化坐标 (可选)
+  y_pos INT DEFAULT 0, -- 前端可视化坐标 (可选)
+  
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ttnc_civ (civ),
+  INDEX idx_ttnc_parent (parent_node_id)
+) ENGINE=InnoDB;
+
+-- 8. 修正 user_troop_progress (支持分支互斥)
+-- 若表已存在，需通过 ALTER TABLE 添加字段；此处为初始化脚本模式，直接修改定义
+-- (注意：在真实生产环境需要写 Migration，这里假设是开发环境重置)
+DROP TABLE IF EXISTS user_troop_progress;
+CREATE TABLE IF NOT EXISTS user_troop_progress (
+  user_id BIGINT NOT NULL,
+  troop_id INT NOT NULL,
+  
+  status INT NOT NULL DEFAULT 0, -- 0=LOCKED, 1=DISCOVERED, 2=UNLOCKED
+  evolution_unlocked TINYINT NOT NULL DEFAULT 0,
+  evolution_tier INT NOT NULL DEFAULT 0, -- 兼容旧逻辑，但树逻辑主要靠 node status
+  
+  chosen_child_node_id BIGINT DEFAULT NULL, -- 关键：分支互斥锁。若不为NULL，则该节点只能进化到此ID，其他兄弟节点锁定。
+  
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (user_id, troop_id)
 ) ENGINE=InnoDB;

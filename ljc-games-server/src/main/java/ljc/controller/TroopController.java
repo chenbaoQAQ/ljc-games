@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 public class TroopController {
 
     private final TroopService troopService;
+    private final ljc.service.TroopTreeService troopTreeService;
 
     // 征兵接口
     // URL: POST http://localhost:8080/troop/recruit?userId=1
@@ -34,10 +35,22 @@ public class TroopController {
         return ljc.common.Result.success(troopService.getTroopCodex(userId));
     }
     
-    // POST /evolve?userId=1 Body: { "troopId": 1001 }
+    // POST /evolve?userId=1 Body: { "fromNodeId": 100, "toNodeId": 101 }
+    // V2: Tree Branch Evolution
     @PostMapping("/evolve")
-    public ljc.common.Result<String> evolve(@RequestParam Long userId, @RequestBody ljc.controller.dto.EvolveTroopReq req) {
-        troopService.evolveTroop(userId, req.getTroopId());
-        return ljc.common.Result.success("进化成功！");
+    public ljc.common.Result<String> evolve(@RequestParam Long userId, @RequestBody ljc.controller.dto.EvolveNodeReq req) {
+        if (req.getFromNodeId() != null && req.getToNodeId() != null) {
+            troopTreeService.evolveNode(userId, req.getFromNodeId(), req.getToNodeId());
+            return ljc.common.Result.success("进化成功！");
+        }
+        
+        // Fallback or Error
+        return ljc.common.Result.error("请求参数错误: 需提供 fromNodeId 和 toNodeId");
+    }
+    
+    // GET /codex/tree?userId=1&civ=CN
+    @GetMapping("/codex/tree")
+    public ljc.common.Result<ljc.service.TroopTreeService.TreeResponse> getTree(@RequestParam Long userId, @RequestParam(defaultValue = "CN") String civ) {
+        return ljc.common.Result.success(troopTreeService.getTroopTree(userId, civ));
     }
 }

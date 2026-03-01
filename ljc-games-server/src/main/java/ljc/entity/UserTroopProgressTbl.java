@@ -16,6 +16,9 @@ public class UserTroopProgressTbl {
     // 0=未解锁进化, 1=已解锁
     private Byte evolutionUnlocked;
     
+    // 分支互斥锁: Chosen Node ID
+    private Long chosenChildNodeId;
+    
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime updatedAt;
 }

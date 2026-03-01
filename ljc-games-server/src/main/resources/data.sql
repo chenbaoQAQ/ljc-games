@@ -522,4 +522,34 @@ INSERT INTO troop_evolution_config (troop_id, next_tier, required_civ, required_
 (2003, 1, 'CN', 10, 3000, '{"atk": 10, "hp": 50}');
 
 
+-- 12. 兵种树节点初始化 (CN 样例树)
+-- 根: 义勇兵 (1001) -> 
+--   Tier 1: 重盾步兵 (2001, CN-1), 强弩兵 (2002, CN-2), 虎豹骑 (2003, CN-3)
+--     Tier 2: 青囊医官 (3001, form 2002?, CN-5)
+INSERT INTO troop_tree_node_config (node_id, troop_id, parent_node_id, civ, tier, unlock_civ, unlock_stage_no, evolve_cost, x_pos, y_pos) VALUES
+-- Root
+(1001, 1001, NULL, 'CN', 0, NULL, 0, 0, 0, 0),
+
+-- Branches (Tier 1)
+-- 义勇兵 -> 重盾步兵 (需 CN-1)
+(2001, 2001, 1001, 'CN', 1, 'CN', 1, 500, -1, 1),
+-- 义勇兵 -> 强弩兵 (需 CN-2)
+(2002, 2002, 1001, 'CN', 1, 'CN', 2, 500, 0, 1),
+-- 义勇兵 -> 虎豹骑 (需 CN-3)
+(2003, 2003, 1001, 'CN', 1, 'CN', 3, 1000, 1, 1),
+
+-- Branches (Tier 2) - 特种兵
+-- 强弩兵 -> 青囊医官 (需 CN-5)
+(3001, 3001, 2002, 'CN', 2, 'CN', 5, 2000, 0, 2)
+
+ON DUPLICATE KEY UPDATE
+    troop_id = VALUES(troop_id),
+    parent_node_id = VALUES(parent_node_id),
+    tier = VALUES(tier),
+    unlock_civ = VALUES(unlock_civ),
+    unlock_stage_no = VALUES(unlock_stage_no),
+    evolve_cost = VALUES(evolve_cost),
+    x_pos = VALUES(x_pos),
+    y_pos = VALUES(y_pos);
+
 SET FOREIGN_KEY_CHECKS = 1;
