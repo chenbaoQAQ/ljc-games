@@ -2,8 +2,8 @@ package ljc.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ljc.battle.core.*;
-import ljc.context.*; // BattleContext, etc
-import ljc.entity.*; // UserGeneralTbl, etc
+import ljc.context.*; // 上下文对象
+import ljc.entity.*; // 实体对象
 import ljc.mapper.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,30 +34,27 @@ public class BattleService {
     
     private final DropPoolMapper dropPoolMapper;
     private final ObjectMapper objectMapper;
-    private final TroopService troopService; // New Injection
+    private final TroopService troopService; // 新增注入：处理兵种解锁/进化权限
 
-    // The Engine (Stateless, reused)
+    // 战斗引擎（无状态，可复用）
     private final BattleEngine battleEngine = new BattleEngine();
 
     {
-        // Inject Default Resolver (V1)
+        // 注入默认技能解析器（V1）
         battleEngine.setSkillResolver(new SkillResolverImpl());
-        // Configure ObjectMapper for State
-        // Ensure unknown properties don't crash (forward compat)
-        // Check if ObjectMapper bean is configured this way globally better.
-        // Assuming default injection is fine.
+        // 状态序列化由 Spring 注入的 ObjectMapper 统一处理
     }
 
-    // --- Start Battle (Story) ---
+    // --- 开始主线战斗 ---
     @Transactional(rollbackFor = Exception.class)
     public BattleStartResult startStoryBattle(Long userId, String civ, Integer stageNo, Long generalId, Map<Integer, Integer> troopConfig) {
-        // 1. Check existing session
+        // 1. 检查是否已有进行中的战斗
         BattleSessionTbl existing = battleSessionMapper.selectByUserId(userId);
         if (existing != null && existing.getStatus() == 0) {
             throw new RuntimeException("已有进行中的战斗");
         }
 
-        // 2. Validate
+        // 2. 校验武将状态
         UserGeneralTbl general = userGeneralMapper.selectById(generalId);
         if (general == null || !Boolean.TRUE.equals(general.getUnlocked())) {
             throw new RuntimeException("武将未解锁");
@@ -66,20 +63,20 @@ public class BattleService {
              throw new RuntimeException("武将正在休整中");
         }
 
-        // 3. Stage Config
+        // 3. 读取关卡配置
         StoryStageConfigTbl stageConfig = storyStageConfigMapper.selectByCivAndStage(civ, stageNo);
         if (stageConfig == null) {
             throw new RuntimeException("关卡不存在");
         }
 
-        // 4. Prepare Sides
+        // 4. 准备双方战斗数据
         BattleState.Side sideA = prepareAllySide(userId, general, troopConfig, stageConfig);
         BattleState.Side sideB = prepareEnemySide(stageConfig);
 
-        // 5. Deduct Troops (Inventory)
+        // 5. 扣除出征兵力（库存）
         deductTroopsFromInventory(userId, sideA.troops);
 
-        // 6. Create Battle State
+        // 6. 构建战斗状态
         BattleState state = new BattleState();
         state.turnNo = 0;
         state.phase = "HERO_SOLO";
@@ -90,7 +87,7 @@ public class BattleService {
         state.statusesA = new HashMap<>();
         state.statusesB = new HashMap<>();
 
-        // 7. Save Session
+        // 7. 创建战斗会话
         BattleSessionTbl session = new BattleSessionTbl();
         session.setUserId(userId);
         session.setBattleId(System.currentTimeMillis());
@@ -104,17 +101,17 @@ public class BattleService {
             throw new RuntimeException("JSON error", e);
         }
 
-        // 9. 初始化 nextActorDesc (V2)
+        // 8. 初始化下一个行动者描述
         state.nextActorDesc = battleEngine.predictNextActor(state);
         try {
-            // Save initial state with actor
+            // 持久化初始状态
             session.setContextJson(objectMapper.writeValueAsString(state));
             battleSessionMapper.insert(session);
         } catch (Exception e) {
             throw new RuntimeException("JSON error", e);
         }
 
-        // 8. 返回 battleId + 初始快照
+        // 9. 返回 battleId + 初始快照
         BattleContext ctx = convertToContext(state, session.getBattleId(), new ArrayList<>());
         return new BattleStartResult(session.getBattleId(), ctx);
     }
@@ -133,27 +130,25 @@ public class BattleService {
             ctx.setWin(session.getStatus() == 1);
             return ctx;
         } catch (Exception e) {
-            throw new RuntimeException("Context Error", e);
+            throw new RuntimeException("战斗上下文解析失败", e);
         }
     }
 
-    // --- Process Turn ---
+    // --- 推进回合 ---
     @Transactional(rollbackFor = Exception.class)
     public BattleContext processTurn(Long userId, Boolean castSkill, Integer clientTurnNo, String tactics) {
-        // Note: Returning BattleContext
-        
-        // 1. Get Session
+        // 1. 读取战斗会话
         BattleSessionTbl session = battleSessionMapper.selectByUserId(userId);
         if (session == null || session.getStatus() != 0) {
             throw new RuntimeException("没有进行中的战斗");
         }
         
-        // ... (lines 143-167 same) ... 
+        // 读取并反序列化战斗状态
         BattleState state;
         try {
             state = objectMapper.readValue(session.getContextJson(), BattleState.class);
         } catch (Exception e) {
-            throw new RuntimeException("Context Error", e);
+            throw new RuntimeException("战斗上下文解析失败", e);
         }
         
         if (clientTurnNo != null) {
@@ -165,7 +160,7 @@ public class BattleService {
 
         TurnCommand cmd = new TurnCommand();
         cmd.clientTurnNo = state.turnNo + 1;
-        cmd.tactics = tactics; // Set Tactics
+        cmd.tactics = tactics; // 写入前端战术指令
         
         if (Boolean.TRUE.equals(castSkill)) {
             cmd.type = TurnCommand.ActionType.SKILL; 
@@ -173,52 +168,36 @@ public class BattleService {
             cmd.type = TurnCommand.ActionType.NORMAL;
         }
 
-        // 4. Execution Loop (Run until Round Ends)
-        // Logic: Frontend press "Turn" -> Backend runs FULL ROUND (All actors act).
-        // This abstracts the queue from frontend.
+        // 4. 执行循环（一次请求推进完整回合）
+        // 前端点一次“推进回合”，后端执行到回合结束或战斗结束。
         List<BattleLogEvent> aggregatedLogs = new ArrayList<>();
         
-        // Safety Break
+        // 保护上限，防止异常死循环
         int maxActions = 20; 
         int actions = 0;
         
-        // Initial check: if Battle Finished
+        // 若战斗已结束，直接返回当前状态
         if (state.isFinished) {
              return convertToContext(state, session.getBattleId(), aggregatedLogs);
         }
         
-        // The Engine processes ONE ACTION per call.
-        // We want to run one full round (or until battle ends).
-        // Round start condition: currentActorIndex == 0.
-        // We start: process(action 0).
-        // then process(action 1)...
-        // until process(action N) -> index resets to 0.
-        
-        boolean roundStarted = (state.currentActorIndex == 0);
-        
         do {
-            // Fix clientTurnNo for loop (Engine checks exact match)
+            // 循环内修正回合号（引擎会校验精确值）
             cmd.clientTurnNo = state.turnNo + 1; 
-            
-            // Pass Skill flag only for Player Hero? 
-            // If we loop, we reuse same cmd?
-            // "castSkill" applies to the whole round? 
-            // If Player Hero acts in this round, he uses skill.
-            // If not (e.g. Stunned), flag wasted. OK.
-            
+
             TurnResult res = battleEngine.processTurn(state, cmd);
             aggregatedLogs.addAll(res.logEvents);
             
             if (res.finished) break;
             
             actions++;
-            // If index went back to 0, Round Finished.
+            // 行动序列回到 0，代表完整回合已结束
             if (state.currentActorIndex == 0) break;
             
         } while (actions < maxActions);
         
-        // 5. Update Session
-        session.setCurrentTurn((int)state.turnNo); // Approx
+        // 5. 更新会话
+        session.setCurrentTurn((int)state.turnNo);
         if (state.isFinished) {
             int result = state.isWin ? 1 : 2;
             finishBattle(session, result, state);
@@ -234,40 +213,35 @@ public class BattleService {
         return convertToContext(state, session.getBattleId(), aggregatedLogs);
     }
     
-    // --- Helper: Prepare Ally Side ---
+    // --- 辅助：构建我方阵容 ---
     private BattleState.Side prepareAllySide(Long userId, UserGeneralTbl general, Map<Integer, Integer> troopConfig, StoryStageConfigTbl stageConfig) {
         BattleState.Side side = new BattleState.Side();
         side.troops = new ArrayList<>();
         
-        // 1. Hero
+        // 1. 武将
         BattleState.Hero hero = new BattleState.Hero();
         GeneralTemplateTbl genTpl = generalTemplateMapper.selectById(general.getTemplateId());
         hero.name = (genTpl != null) ? genTpl.getName() : "Hero";
-        hero.speed = (genTpl != null) ? genTpl.getSpeed() : 50; // Default 50
+        hero.speed = (genTpl != null) ? genTpl.getSpeed() : 50; // 默认速度 50
         
-        // Skills Mapping
+        // 技能映射
         hero.actives = new ArrayList<>();
         hero.passives = new ArrayList<>();
-            // Personality -> Passive
+        // 性格 -> 被动
         if (genTpl != null && genTpl.getPersonalityCode() != null) {
-            String p = SkillIdMapper.getEnginePassiveId(genTpl.getPersonalityCode());
+            String p = SkillIdAdapter.getEnginePassiveId(genTpl.getPersonalityCode());
             if (p != null) hero.passives.add(p);
         }
-            // User Skill (DB: user_general_skill) -> Active
-            // Need mapper (not yet autowired? Add it or query directly)
-            // Simplified: Default Skill from Template
+        // 先使用模板默认技能；用户自定义技能后续再接入
         if (genTpl != null && genTpl.getDefaultSkillId() != 0) {
-             String skillName = SkillIdMapper.getEngineSkillId(genTpl.getDefaultSkillId());
+             String skillName = SkillIdAdapter.getEngineSkillId(genTpl.getDefaultSkillId());
              if (skillName != null) hero.actives.add(skillName);
         }
         
-        // Stats
+        // 属性计算
         long maxHp = general.getMaxHp();
-        // Calc Equipment Stats... (Same as before code, omitted for brevity, assuming Load logic)
-        // Let's assume UserGeneralTbl has *final* values or we calc basic here
-        // Re-use logic:
         long atk = (genTpl != null) ? genTpl.getBaseAtk() : 50; 
-        // ... (Equipment calc omitted, using base + level*10 for MVP)
+        // 当前版本先用基础值 + 等级成长；完整装备结算后续再补
         atk += (general.getLevel() - 1) * 10L;
         maxHp += (general.getLevel() - 1) * 50L;
         
@@ -278,8 +252,8 @@ public class BattleService {
         
         side.hero = hero;
 
-        // 2. Troops
-        // Validate Capacity
+        // 2. 兵种
+        // 校验统率占用
         int capacity = general.getCapacity() == null ? 5 : general.getCapacity();
         int used = 0;
         
@@ -289,24 +263,24 @@ public class BattleService {
                 TroopTemplateTbl tpl = troopTemplateMapper.selectById(entry.getKey());
                 if (tpl != null) {
                      int cost = tpl.getCost() == null ? 1 : tpl.getCost();
-                     if (used + entry.getValue() * cost > capacity) continue; // Skip overflow
+                     if (used + entry.getValue() * cost > capacity) continue; // 超统率则跳过
                      used += entry.getValue() * cost;
                      
-                     // Create Stack with troopId and initialCount
+                     // 创建兵堆并记录初始数量
                      TroopStack stack = new TroopStack(
                          tpl.getTroopId(),
-                         tpl.getTroopType(), // "INF"
+                         tpl.getTroopType(), // 兵种类型编码
                          entry.getValue(), 
                          tpl.getBaseHp().intValue()
                      );
-                     stack.initialCount = stack.count; // Explicitly set for new field
+                     stack.initialCount = stack.count; // 显式设置初始数量
                      stack.frontHp = stack.unitHp;
                      side.troops.add(stack);
                 }
             }
         }
         
-        // 3. Wall Cost Logic (Reuse logic: reduce counts)
+        // 3. 城墙战损（攻城关卡）
         if ("WALL".equals(stageConfig.getStageType())) {
              int deduct = stageConfig.getWallCostTroops() == null ? 0 : stageConfig.getWallCostTroops();
              for (TroopStack s : side.troops) {
@@ -324,10 +298,10 @@ public class BattleService {
              for (TroopStack s : side.troops) {
                  s.initialCount = s.count;
              }
-             if (side.troops.stream().allMatch(s -> s.count <= 0)) throw new RuntimeException("Troops died at wall");
+             if (side.troops.stream().allMatch(s -> s.count <= 0)) throw new RuntimeException("攻城损耗后兵力不足");
         }
 
-        // 4. Accessory aura: troop-wide buff (currently supports troop attack rate only)
+        // 4. 饰品光环：当前支持兵种攻击加成
         applyAccessoryAura(side, userId, general.getId());
         
         return side;
@@ -383,7 +357,7 @@ public class BattleService {
             
             if (tList != null) {
                 for (Map t : tList) {
-                    int tId = ((Number) t.getOrDefault("troopId", 0)).intValue(); // Enemy troop ID
+                    int tId = ((Number) t.getOrDefault("troopId", 0)).intValue(); // 敌方兵种ID
                     String type = (String) t.getOrDefault("type", "INF");
                     int count = ((Number) t.getOrDefault("count", 10)).intValue();
                     int unitHp = ((Number) t.getOrDefault("unitHp", 20)).intValue();
@@ -401,7 +375,7 @@ public class BattleService {
         return side;
     }
     
-    // --- Helpers ---
+    // --- 通用辅助 ---
     private void validateGeneral(UserGeneralTbl g, Long userId) {
         if (!g.getUserId().equals(userId)) throw new RuntimeException("General not owner");
         if (!Boolean.TRUE.equals(g.getActivated())) throw new RuntimeException("Not activated");
@@ -436,7 +410,7 @@ public class BattleService {
          }
     }
     
-    // Finish
+    // 结束战斗
     private void finishBattle(BattleSessionTbl session, int result, BattleState state) {
         session.setStatus(result);
         session.setUpdatedAt(LocalDateTime.now());
@@ -447,8 +421,7 @@ public class BattleService {
         }
         battleSessionMapper.update(session);
         
-        // Handle Rewards & Settlement
-        // Even if lose, we might recover some troops
+        // 结算与奖励
         handleSettlement(session, state, result == 1);
     }
     
@@ -457,15 +430,15 @@ public class BattleService {
         String civ = session.getCiv();
         Integer stageNo = session.getStageNo();
         
-        // 1. Troop Recovery (Dead Troops Rescue)
-        // Rule: Survivors return 100%. Dead troops recovered at 50% (Win) or 10% (Lose).
+        // 1. 兵力返还
+        // 规则：存活100%返还；阵亡按胜利50%/失败10%救援返还。
         double rescueRate = isWin ? 0.5 : 0.1;
         
         for (TroopStack s : state.sideA.troops) {
-            if (s.troopId <= 0) continue; // Skip summons/unknown
+            if (s.troopId <= 0) continue; // 跳过召唤物/未知兵种
             
             int survivors = s.count;
-            int initial = s.initialCount > survivors ? s.initialCount : survivors; // Safety
+            int initial = s.initialCount > survivors ? s.initialCount : survivors; // 安全保护
             int dead = initial - survivors;
             int rescued = (int) (dead * rescueRate);
             int totalReturn = survivors + rescued;
@@ -475,14 +448,14 @@ public class BattleService {
             }
         }
         
-        // 2. Victory Rewards (Only if Win)
+        // 2. 胜利奖励（仅胜利发放）
         if (isWin) {
             handleVictoryRewards(userId, civ, stageNo);
         }
     }
 
     private void handleVictoryRewards(Long userId, String civ, Integer stageNo) {
-        // A. Update Progress (Max Stage)
+        // A. 更新主线进度（最大通关关卡）
         UserCivProgressTbl p = userCivProgressMapper.selectByUserIdAndCiv(userId, civ);
         if (p != null) {
             if (stageNo > (p.getMaxStageCleared() == null ? 0 : p.getMaxStageCleared())) {
@@ -490,7 +463,7 @@ public class BattleService {
                 userCivProgressMapper.update(p);
             }
         } else {
-            // Should exist if we entered battle, but safe fallback
+            // 理论上进入战斗前已存在，兜底创建
             p = new UserCivProgressTbl();
             p.setUserId(userId);
             p.setCiv(civ);
@@ -499,10 +472,10 @@ public class BattleService {
             userCivProgressMapper.insert(p);
         }
         
-        // B. Configuration Unlocks (General, Civ)
+        // B. 配置解锁（武将、国家、兵种、进化权限）
         StoryUnlockConfigTbl unlock = storyUnlockConfigMapper.selectByCivAndStage(civ, stageNo);
         if (unlock != null) {
-            // Unlock General（防重：已拥有则跳过）
+            // 解锁武将（防重：已拥有则跳过）
             if (unlock.getUnlockGeneralTemplateId() != null) {
                 Integer gid = unlock.getUnlockGeneralTemplateId();
                 UserGeneralTbl existing = userGeneralMapper.selectByUserIdAndTemplateId(userId, gid);
@@ -527,7 +500,7 @@ public class BattleService {
                 }
             }
             
-            // Unlock Next Civ
+            // 解锁下一国家
             if (unlock.getUnlockNextCiv() != null) {
                 String nextCiv = unlock.getUnlockNextCiv();
                 UserCivProgressTbl np = userCivProgressMapper.selectByUserIdAndCiv(userId, nextCiv);
@@ -544,25 +517,25 @@ public class BattleService {
                 }
             }
             
-            // New: Unlock Troop
+            // 解锁兵种
             if (unlock.getUnlockTroopId() != null) {
                 troopService.unlockTroop(userId, unlock.getUnlockTroopId());
             }
             
-            // New: Unlock Evolution
+            // 解锁进化权限
             if (unlock.getUnlockEvolutionTroopId() != null) {
                 troopService.unlockEvolution(userId, unlock.getUnlockEvolutionTroopId());
             }
         }
         
-        // C. Drops (Gold) — MVP: 只取第一个 GOLD entry 发一次
+        // C. 掉落（金）—— 当前版本只发第一个金币条目
         StoryStageConfigTbl stageCfg = storyStageConfigMapper.selectByCivAndStage(civ, stageNo);
         if (stageCfg != null && stageCfg.getDropPoolId() != null) {
              DropPoolTbl pool = dropPoolMapper.selectById(stageCfg.getDropPoolId());
              if (pool != null && pool.getEntriesJson() != null) {
                  try {
                      List<Map<String, Object>> entries = objectMapper.readValue(pool.getEntriesJson(), List.class);
-                     // MVP: 找到第一个 GOLD entry 就发，不循环所有
+                     // 找到第一个金币条目后发放一次
                      for (Map<String, Object> entry : entries) {
                          String type = (String) entry.getOrDefault("type", "");
                          if ("GOLD".equals(type)) {
@@ -572,7 +545,7 @@ public class BattleService {
                              if (val > 0) {
                                   userMapper.reduceGold(userId, -val);
                              }
-                             break; // 只发一次
+                             break; // 仅发一次
                          }
                      }
                  } catch (Exception e) {
@@ -582,12 +555,12 @@ public class BattleService {
         }
     }
 
-    // Convert to Context for Frontend
+    // 转换为前端上下文结构
     private BattleContext convertToContext(BattleState state, Long battleId, List<BattleLogEvent> logs) {
         BattleContext ctx = new BattleContext();
         ctx.setBattleId(battleId);
         
-        // V2: Direct Mapping
+        // V2：直接映射
         ctx.setSideA(state.sideA);
         ctx.setSideB(state.sideB);
         ctx.setNextActorDesc(state.nextActorDesc);
@@ -597,7 +570,7 @@ public class BattleService {
         ctx.setFinished(state.isFinished);
         ctx.setWin(state.isWin);
 
-        // Map Logs (Legacy String)
+        // 兼容旧前端：保留字符串日志
         List<String> strLogs = new ArrayList<>();
         if(logs != null) {
             for (BattleLogEvent e : logs) {
@@ -606,7 +579,7 @@ public class BattleService {
             ctx.setLogs(strLogs);
         }
         
-        // Ally/Enemy (Legacy Mapping, keep for safety)
+        // 兼容旧前端：保留 ally/enemy 结构
         BattleContext.SideContext ally = new BattleContext.SideContext();
         ally.setHero(mapHero(state.sideA.hero));
         ally.setTroops(mapTroops(state.sideA.troops));
@@ -647,13 +620,13 @@ public class BattleService {
         return ret;
     }
 
-    // Start Battle Override (Legacy)
+    // 兼容旧入口：startBattle
     @Transactional(rollbackFor = Exception.class)
     public BattleStartResult startBattle(Long userId, Integer dungeonId) { 
         List<UserGeneralTbl> gs = userGeneralMapper.selectByUserId(userId);
         Long gid = null;
         for(UserGeneralTbl g : gs) { if(Boolean.TRUE.equals(g.getActivated())) { gid = g.getId(); break; }}
-        if(gid == null) throw new RuntimeException("No active general");
+        if(gid == null) throw new RuntimeException("没有可出战的激活武将");
         
         return startStoryBattle(userId, "CN", dungeonId, gid, null);
     }

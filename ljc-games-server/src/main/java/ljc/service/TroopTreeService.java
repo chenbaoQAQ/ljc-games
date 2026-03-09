@@ -23,7 +23,7 @@ public class TroopTreeService {
     private final UserMapper userMapper;
     private final TroopTemplateMapper troopTemplateMapper;
 
-    // DTO for Tree Response
+    // 进化树响应 DTO
     @Data
     public static class TickInfo {
         private Long nodeId;
@@ -32,7 +32,7 @@ public class TroopTreeService {
         private Integer tier;
         private Long parentNodeId;
         private String unlockHint;
-        private String status; // LOCKED, DISCOVERED, UNLOCKED, EVOLVED, BRANCH_LOCKED
+        private String status; // 状态值：LOCKED / DISCOVERED / UNLOCKED / EVOLVED / BRANCH_LOCKED
         private Boolean isEvolvable;
         private Integer evolveCost;
         private Integer xPos;
@@ -60,7 +60,7 @@ public class TroopTreeService {
             progressMap.put(p.getTroopId(), p);
         }
         
-        // Build Node Map for calculating Branch Locks
+        // 构建节点映射，便于计算分支互斥
         Map<Long, TroopTreeNodeConfigTbl> configMap = new HashMap<>();
         for (TroopTreeNodeConfigTbl c : configs) configMap.put(c.getNodeId(), c);
         
@@ -77,20 +77,20 @@ public class TroopTreeService {
             node.setXPos(cfg.getXPos());
             node.setYPos(cfg.getYPos());
             
-            // Name
+            // 名称
             ljc.entity.TroopTemplateTbl tpl = troopTemplateMapper.selectById(cfg.getTroopId());
             node.setName(tpl != null ? tpl.getName() : "Unknown");
             
-            // Status Logic
+            // 状态计算
             UserTroopProgressTbl p = progressMap.get(cfg.getTroopId());
             
-            // Check Parent Branch Lock
+            // 检查父节点分支互斥
             boolean isBranchLocked = false;
             if (cfg.getParentNodeId() != null) {
                 TroopTreeNodeConfigTbl parentCfg = configMap.get(cfg.getParentNodeId());
                 if (parentCfg != null) {
                     UserTroopProgressTbl parentP = progressMap.get(parentCfg.getTroopId());
-                    // If parent has chosen a child, and it is NOT this one -> Branch Locked
+                    // 父节点已选其他分支时，当前分支锁定
                     if (parentP != null && parentP.getChosenChildNodeId() != null 
                             && !parentP.getChosenChildNodeId().equals(cfg.getNodeId())) {
                         isBranchLocked = true;
@@ -106,17 +106,17 @@ public class TroopTreeService {
                 node.setStatus("BRANCH_LOCKED");
                 node.setIsEvolvable(false);
                 node.setUnlockHint("已选择其他进化分支");
-            } else if (p != null && (p.getStatus() == 2)) { // UNLOCKED
-                 // Check if it has evolved further (optional visual cue)
+            } else if (p != null && (p.getStatus() == 2)) { // 已解锁
+                 // 若已有下级分支，展示为已进化
                  if (p.getChosenChildNodeId() != null) {
-                     node.setStatus("EVOLVED"); // or just UNLOCKED
+                     node.setStatus("EVOLVED");
                  } else {
                      node.setStatus("UNLOCKED");
                  }
-                 node.setIsEvolvable(false); // Already unlocked this node itself
+                 node.setIsEvolvable(false); // 当前节点本身已解锁，不可再次进化
             } else {
-                // Not unlocked yet. Check conditions
-                // 1. Check Parent Unlocked
+                // 未解锁节点：继续校验条件
+                // 1. 校验父节点是否已解锁
                 boolean parentUnlocked = true;
                 if (cfg.getParentNodeId() != null) {
                      TroopTreeNodeConfigTbl parentCfg = configMap.get(cfg.getParentNodeId());
@@ -131,7 +131,7 @@ public class TroopTreeService {
                      node.setUnlockHint("请先解锁前置兵种");
                      node.setIsEvolvable(false);
                 } else {
-                    // Parent is ready. Check external conditions (Civ/Stage)
+                    // 父节点满足后，再校验外部条件（国家/关卡）
                     boolean condMet = true;
                     if (cfg.getUnlockCiv() != null && cfg.getUnlockStageNo() != null) {
                         ljc.entity.UserCivProgressTbl civP = userCivProgressMapper.selectByUserIdAndCiv(userId, cfg.getUnlockCiv());
@@ -142,7 +142,7 @@ public class TroopTreeService {
                     }
                     
                     if (condMet) {
-                        node.setStatus("DISCOVERED"); // Ready to evolve
+                        node.setStatus("DISCOVERED"); // 可进化状态
                         node.setIsEvolvable(true);
                         node.setUnlockHint("可进化");
                     } else {
@@ -163,7 +163,7 @@ public class TroopTreeService {
 
     @Transactional(rollbackFor = Exception.class)
     public void evolveNode(Long userId, Long fromNodeId, Long toNodeId) {
-        // 1. Config Validation
+        // 1. 配置校验
         TroopTreeNodeConfigTbl toCfg = treeConfigMapper.selectById(toNodeId);
         if (toCfg == null) throw new RuntimeException("目标节点不存在");
         
@@ -173,13 +173,13 @@ public class TroopTreeService {
         
         TroopTreeNodeConfigTbl fromCfg = treeConfigMapper.selectById(fromNodeId);
         
-        // 2. Parent Status Check
+        // 2. 父节点状态校验
         UserTroopProgressTbl fromProgress = userTroopProgressMapper.selectByPrimaryKey(userId, fromCfg.getTroopId());
         if (fromProgress == null || fromProgress.getStatus() < 2) {
              throw new RuntimeException("前置兵种未解锁");
         }
         
-        // 3. Mutual Exclusion Check
+        // 3. 分支互斥校验
         if (fromProgress.getChosenChildNodeId() != null) {
              if (fromProgress.getChosenChildNodeId().equals(toNodeId)) {
                  throw new RuntimeException("该分支已进化");
@@ -188,7 +188,7 @@ public class TroopTreeService {
              }
         }
         
-        // 4. Condition Check
+        // 4. 解锁条件校验
         if (toCfg.getUnlockCiv() != null && toCfg.getUnlockStageNo() != null) {
             ljc.entity.UserCivProgressTbl civP = userCivProgressMapper.selectByUserIdAndCiv(userId, toCfg.getUnlockCiv());
             if (civP == null || !Boolean.TRUE.equals(civP.getUnlocked()) || civP.getMaxStageCleared() < toCfg.getUnlockStageNo()) {
@@ -196,26 +196,26 @@ public class TroopTreeService {
             }
         }
         
-        // 5. Cost Check
+        // 5. 资源校验
         if (toCfg.getEvolveCost() > 0) {
             int rows = userMapper.reduceGold(userId, toCfg.getEvolveCost());
             if (rows == 0) throw new RuntimeException("金币不足");
         }
         
-        // 6. Execute Evolution
-        // A. Lock Parent to this Branch
+        // 6. 执行进化
+        // A. 记录父节点已选择分支
         fromProgress.setChosenChildNodeId(toNodeId);
         userTroopProgressMapper.updateByPrimaryKey(fromProgress);
         
-        // B. Unlock Child
+        // B. 解锁子节点
         UserTroopProgressTbl toProgress = userTroopProgressMapper.selectByPrimaryKey(userId, toCfg.getTroopId());
         if (toProgress == null) {
             toProgress = new UserTroopProgressTbl();
             toProgress.setUserId(userId);
             toProgress.setTroopId(toCfg.getTroopId());
-            toProgress.setStatus(2); // Unlocked
+            toProgress.setStatus(2); // 已解锁
             toProgress.setEvolutionUnlocked((byte)1);
-            toProgress.setEvolutionTier(0); // P0-3: Initialize tier
+            toProgress.setEvolutionTier(0); // 初始化进化层级
             userTroopProgressMapper.insert(toProgress);
         } else {
             toProgress.setStatus(2);
