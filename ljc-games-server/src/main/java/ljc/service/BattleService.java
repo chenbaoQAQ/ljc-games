@@ -217,6 +217,7 @@ public class BattleService {
     private BattleState.Side prepareAllySide(Long userId, UserGeneralTbl general, Map<Integer, Integer> troopConfig, StoryStageConfigTbl stageConfig) {
         BattleState.Side side = new BattleState.Side();
         side.troops = new ArrayList<>();
+        int requestedTotal = 0;
         
         // 1. 武将
         BattleState.Hero hero = new BattleState.Hero();
@@ -260,6 +261,7 @@ public class BattleService {
         if (troopConfig != null) {
             for (Map.Entry<Integer, Integer> entry : troopConfig.entrySet()) {
                 if (entry.getValue() <= 0) continue;
+                requestedTotal += entry.getValue();
                 TroopTemplateTbl tpl = troopTemplateMapper.selectById(entry.getKey());
                 if (tpl != null) {
                      int cost = tpl.getCost() == null ? 1 : tpl.getCost();
@@ -278,6 +280,13 @@ public class BattleService {
                      side.troops.add(stack);
                 }
             }
+        }
+
+        if (requestedTotal <= 0) {
+            throw new RuntimeException("请先配置出战兵力");
+        }
+        if (requestedTotal > 0 && side.troops.isEmpty()) {
+            throw new RuntimeException("兵力配置超过统率上限，请重新分配");
         }
         
         // 3. 城墙战损（攻城关卡）

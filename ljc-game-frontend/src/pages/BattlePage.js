@@ -1,6 +1,6 @@
 import { battleAPI, hallAPI } from '../api/index.js';
 import { router } from '../utils/router.js';
-import { getTroopTypeName } from '../config/gameData.js';
+import { getTroopMeta, getTroopTypeName } from '../config/gameData.js';
 
 export function BattlePage(container, params) {
     const userId = localStorage.getItem('userId');
@@ -193,12 +193,22 @@ export function BattlePage(container, params) {
 
     function updateTroops(side, troops) {
         const container = document.getElementById(`troops-${side}`);
-        container.innerHTML = troops.map(t => `
+        const list = Array.isArray(troops) ? troops : [];
+        if (list.length === 0) {
+            container.innerHTML = `<div class="troop-unit troop-dead"><span>${side === 'a' ? '我方暂无出战兵力' : '敌方暂无兵力'}</span></div>`;
+            return;
+        }
+
+        container.innerHTML = list.map(t => {
+            const meta = getTroopMeta(t.troopId);
+            const troopLabel = meta?.name || getTroopTypeName(t.type) || t.type || '未知兵种';
+            return `
         <div class="troop-unit ${t.count <= 0 ? 'troop-dead' : ''}">
-           <span>${getTroopIcon(t.type)} ${t.name || t.type}</span>
+           <span>${getTroopIcon(t.type)} ${troopLabel}</span>
            <span>x${t.count}</span>
         </div>
-      `).join('');
+      `;
+        }).join('');
     }
 
     function getTroopIcon(type) {

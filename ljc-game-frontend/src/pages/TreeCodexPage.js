@@ -10,7 +10,7 @@ export function TreeCodexPage(container) {
 
     const state = {
         treeData: null,
-        selectedCiv: 'CN',
+        selectedCiv: 'ALL',
     };
 
     container.innerHTML = `
@@ -21,7 +21,11 @@ export function TreeCodexPage(container) {
             </nav>
 
             <div class="civ-selector">
-                <button class="btn-civ active" data-civ="CN">魏蜀吴(CN)</button>
+                <button class="btn-civ active" data-civ="ALL">全兵种</button>
+                <button class="btn-civ" data-civ="CN">魏蜀吴</button>
+                <button class="btn-civ" data-civ="JP">战国</button>
+                <button class="btn-civ" data-civ="KR">朝鲜</button>
+                <button class="btn-civ" data-civ="GB">英伦</button>
             </div>
 
             <div class="tree-viewport" id="tree-viewport">
@@ -94,8 +98,8 @@ export function TreeCodexPage(container) {
                 position: absolute;
                 top: 0;
                 left: 0;
-                width: 2000px;
-                height: 1000px;
+                width: 3600px;
+                height: 1200px;
                 z-index: 1;
                 pointer-events: none;
             }
@@ -103,8 +107,8 @@ export function TreeCodexPage(container) {
                 position: absolute;
                 top: 0;
                 left: 0;
-                width: 2000px;
-                height: 1000px;
+                width: 3600px;
+                height: 1200px;
                 z-index: 2;
             }
             .tree-node {
@@ -178,6 +182,16 @@ export function TreeCodexPage(container) {
     document.getElementById('tree-close-detail').addEventListener('click', () => {
         document.getElementById('node-detail-panel').classList.add('hidden');
     });
+    container.querySelectorAll('.btn-civ').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const civ = btn.dataset.civ;
+            if (!civ || civ === state.selectedCiv) return;
+            state.selectedCiv = civ;
+            container.querySelectorAll('.btn-civ').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            await loadTree();
+        });
+    });
 
     loadTree();
 
@@ -197,6 +211,7 @@ export function TreeCodexPage(container) {
     }
 
     function renderTree() {
+        const viewport = document.getElementById('tree-viewport');
         const linksSvg = document.getElementById('tree-links');
         const nodesContainer = document.getElementById('tree-nodes');
         linksSvg.innerHTML = '';
@@ -206,7 +221,7 @@ export function TreeCodexPage(container) {
 
         const gridX = 150;
         const gridY = 140;
-        const baseX = 500;
+        const baseX = 1700;
         const baseY = 60;
 
         state.treeData.nodes.forEach((node) => {
@@ -243,6 +258,12 @@ export function TreeCodexPage(container) {
             line.setAttribute('stroke-width', '2');
             linksSvg.appendChild(line);
         });
+
+        // 渲染后把视口移动到树中心区域，避免初始只看到空白边缘
+        if (viewport) {
+            viewport.scrollLeft = 1200;
+            viewport.scrollTop = 0;
+        }
     }
 
     function openDetail(node) {

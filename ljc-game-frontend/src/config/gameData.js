@@ -6,6 +6,7 @@ export const CIV_BASE_TROOP = {
 };
 
 export const TROOP_CATALOG = {
+  1001: { troopId: 1001, civ: "CN", type: "INF", name: "义勇兵", icon: "⚔️", color: "var(--inf-color)", recruitGold: 10, capCost: 1, isElite: false },
   2001: { troopId: 2001, civ: "CN", type: "INF", name: "重盾步兵", icon: "🛡️", color: "var(--inf-color)", recruitGold: 22, capCost: 2, isElite: false },
   2002: { troopId: 2002, civ: "CN", type: "ARC", name: "强弩兵", icon: "🏹", color: "var(--arc-color)", recruitGold: 24, capCost: 2, isElite: false },
   2003: { troopId: 2003, civ: "CN", type: "CAV", name: "虎豹骑", icon: "🐎", color: "var(--cav-color)", recruitGold: 42, capCost: 3, isElite: false },

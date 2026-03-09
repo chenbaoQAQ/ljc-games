@@ -423,7 +423,7 @@ export function HallPage(container) {
       <div class="troop-item">
         <div class="troop-icon" style="background: ${troop.color};">${troop.icon}</div>
         <div class="troop-info">
-          <span class="troop-name">[${troop.civ}] ${troop.name}${troop.isElite ? ' [特种]' : ''}</span>
+          <span class="troop-name">${troop.civ ? `[${troop.civ}] ` : ''}${troop.name}${troop.isElite ? ' [特种]' : ''}</span>
           <span class="troop-count">${troop.count.toLocaleString()}</span>
         </div>
       </div>
